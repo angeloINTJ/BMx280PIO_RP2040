@@ -1,0 +1,49 @@
+{
+  "name": "BME280_PIO",
+  "version": "1.0.0",
+  "description": "BME280 sensor driver using PIO-based I2C for Raspberry Pi Pico (RP2040). Reads temperature, humidity, and pressure via Programmable I/O without using the chip's hardware I2C peripherals.",
+  "keywords": [
+    "BME280",
+    "RP2040",
+    "PIO",
+    "I2C",
+    "sensor",
+    "temperature",
+    "humidity",
+    "pressure",
+    "Raspberry Pi Pico",
+    "PlatformIO"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/angelodavide/bme280-pio-rp2040.git"
+  },
+  "authors": [
+    {
+      "name": "angeloINTJ",
+      "url": "https://github.com/angelodavide"
+    }
+  ],
+  "license": "MIT",
+  "frameworks": "arduino",
+  "platforms": "raspberrypi",
+  "headers": [
+    "BME280_PIO.h",
+    "PIO_I2C.h"
+  ],
+  "examples": [
+    {
+      "name": "Basic Reading",
+      "base": "examples/basic_reading",
+      "files": ["basic_reading.cpp"]
+    },
+    {
+      "name": "Forced Mode",
+      "base": "examples/forced_mode",
+      "files": ["forced_mode.cpp"]
+    }
+  ],
+  "dependencies": {
+    "earlephilhower/arduino-pico": "^4.0.0"
+  }
+}
