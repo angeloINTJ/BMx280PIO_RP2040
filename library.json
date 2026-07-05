@@ -16,12 +16,12 @@
   ],
   "repository": {
     "type": "git",
-    "url": "https://github.com/angelodavide/bme280-pio-rp2040.git"
+    "url": "https://github.com/angeloINTJ/bme280-pio-rp2040.git"
   },
   "authors": [
     {
       "name": "angeloINTJ",
-      "url": "https://github.com/angelodavide"
+      "url": "https://github.com/angeloINTJ"
     }
   ],
   "license": "MIT",

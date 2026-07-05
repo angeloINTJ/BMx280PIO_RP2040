@@ -29,7 +29,7 @@ Adicione ao `platformio.ini`:
 platform = raspberrypi
 board = rpipico
 framework = arduino
-lib_deps = angelodavide/bme280-pio-rp2040
+lib_deps = angeloINTJ/bme280-pio-rp2040
 ```
 
 ### Arduino IDE
@@ -42,7 +42,7 @@ lib_deps = angelodavide/bme280-pio-rp2040
 
 ```bash
 cd ~/Arduino/libraries/
-git clone https://github.com/angelodavide/bme280-pio-rp2040.git
+git clone https://github.com/angeloINTJ/bme280-pio-rp2040.git
 ```
 
 ## Uso Rápido
