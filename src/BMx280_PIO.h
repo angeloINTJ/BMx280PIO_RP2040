@@ -1,9 +1,13 @@
 /*
- * BMx280_PIO.h - BMP280/BME280 sensor driver for RP2040
+ * BMx280_PIO.h - BMP280/BME280 Sensor Driver for RP2040
  *
- * Supports both PIO-based I2C and hardware I2C (Wire) as transport.
+ * Supports GPIO-based I2C and hardware I2C (Wire) as transport.
  * Auto-detects BMP280 vs BME280 by chip ID.
- * Double-precision compensation verified against Bosch datasheet.
+ * Bosch datasheet compensation formulas (double-precision pressure,
+ * integer temperature, integer humidity).
+ *
+ * Author: Ângelo Moisés Alves
+ * License: MIT
  */
 
 #ifndef BMx280_PIO_H

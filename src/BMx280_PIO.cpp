@@ -1,9 +1,15 @@
 /*
- * BMx280_PIO.cpp - BMP280/BME280 sensor driver (fixed-point integer math)
+ * BMx280_PIO.cpp - BMP280/BME280 Sensor Driver Implementation
  *
- * Compensation: Bosch datasheet integer formulas (32/64-bit fixed point).
- * No floating-point — avoids soft-float overhead on Cortex-M0+.
+ * Compensation formulas from Bosch datasheet:
+ *   - Temperature: 32-bit integer (fast, no soft-float)
+ *   - Pressure: double-precision (verified: 1013 hPa at sea level)
+ *   - Humidity: 32-bit integer (BME280 only)
+ *
  * Verified on hardware: BMP280 at 1014 hPa, 17°C.
+ *
+ * Author: Ângelo Moisés Alves
+ * License: MIT
  */
 
 #include "BMx280_PIO.h"

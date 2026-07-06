@@ -1,11 +1,14 @@
 /*
- * PIO_I2C.h - I2C Master via PIO state machine for RP2040
+ * PIO_I2C.h - I2C Master for RP2040
  *
- * Architecture: same pattern as OneWirePIO_RP2040 / DHT22PIO_RP2040
- *   - PIO handles ALL I2C timing (no CPU delays in transport layer)
- *   - FIFO-based command/response interface
- *   - Dynamic PIO allocation (pio0 or pio1)
- *   - RAII: SM released on destruction
+ * GPIO-based I2C transport layer. Works on any pin pair using
+ * open-drain SDA emulation via GPIO direction control.
+ *
+ * Follows the same architecture pattern as OneWirePIO_RP2040
+ * and DHT22PIO_RP2040.
+ *
+ * A PIO-accelerated version is included in pio/i2c.pio for
+ * future hardware offload of I2C timing.
  */
 
 #ifndef PIO_I2C_H

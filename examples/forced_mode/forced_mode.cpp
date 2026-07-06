@@ -1,70 +1,61 @@
 /*
- * Forced Mode Example for BME280_PIO
+ * Forced Mode Example for BMx280_PIO
  *
- * Demonstrates the use of Forced Mode for low-power operation.
- * In Forced Mode, the sensor takes a single measurement and then
- * returns to Sleep mode, consuming minimal power.
+ * Demonstrates Forced Mode for low-power operation.
+ * The sensor takes a single measurement then returns to Sleep mode,
+ * consuming minimal power between readings.
  *
- * This is ideal for battery-powered weather stations and IoT sensors
+ * Ideal for battery-powered weather stations and IoT sensors
  * that only need periodic readings.
  *
  * Wiring:
- *   BME280 VCC → 3.3V
- *   BME280 GND → GND
- *   BME280 SDA → GPIO4
- *   BME280 SCL → GPIO5
+ *   Sensor VCC → 3.3V
+ *   Sensor GND → GND
+ *   Sensor SDA → GPIO2
+ *   Sensor SCL → GPIO3
  */
 
 #include <Arduino.h>
-#include "BME280_PIO.h"
+#include "BMx280_PIO.h"
 
-// Define I2C pins
-#define SDA_PIN 4
-#define SCL_PIN 5
+#define SDA_PIN 2
+#define SCL_PIN 3
+#define INTERVAL_MS 60000  // 1 minute between readings
 
-// Measurement interval in milliseconds
-#define INTERVAL_MS 60000  // 1 minute
-
-BME280_PIO bme(SDA_PIN, SCL_PIN);
+BMx280_PIO bme(SDA_PIN, SCL_PIN);
 
 void setup() {
-    Serial.begin(9600);
-    while (!Serial) {
-        ; // Wait for Serial
-    }
+    Serial.begin(115200);
+    while (!Serial) { /* wait for USB Serial */ }
 
-    Serial.println("BME280 PIO - Forced Mode Example");
-    Serial.println("================================");
+    Serial.println("BMx280 Forced Mode Example");
+    Serial.println("==========================");
 
     if (!bme.begin()) {
-        Serial.println("ERROR: Could not find BME280!");
+        Serial.println("ERROR: Sensor not found!");
         while (1) delay(1000);
     }
 
-    // Configure oversampling
-    // Higher oversampling = better accuracy but longer measurement time
+    // Configure for low power: 1x oversampling, no filter
     bme.setTemperatureOversampling(BME280_OS_1X);
     bme.setPressureOversampling(BME280_OS_1X);
-    bme.setHumidityOversampling(BME280_OS_1X);
-    bme.setFilter(BME280_FILTER_OFF); // No filtering in forced mode
+    bme.setFilter(BME280_FILTER_OFF);
 
-    // Sensor starts in SLEEP mode by default
-    Serial.println("Sensor ready. Taking measurements every 60 seconds...");
-    Serial.println();
+    Serial.print("Sensor: ");
+    Serial.println(bme.isBME280() ? "BME280" : "BMP280");
+    Serial.print("Reading every ");
+    Serial.print(INTERVAL_MS / 1000);
+    Serial.println(" seconds...\n");
 }
 
 void loop() {
-    Serial.print("Taking measurement... ");
+    Serial.print("Measuring... ");
 
-    // Trigger a single forced measurement
-    // This method blocks until the measurement completes
     if (bme.takeForcedMeasurement()) {
         Serial.println("done!");
 
-        // Read the values (sensor is now back in sleep mode)
         float temperature = bme.readTemperature();
         float pressure    = bme.readPressure();
-        float humidity    = bme.readHumidity();
 
         Serial.print("Temperature: ");
         Serial.print(temperature, 2);
@@ -74,18 +65,27 @@ void loop() {
         Serial.print(pressure, 2);
         Serial.println(" hPa");
 
-        Serial.print("Humidity:    ");
-        Serial.print(humidity, 2);
-        Serial.println(" %");
+        if (bme.isBME280()) {
+            float humidity = bme.readHumidity();
+            Serial.print("Humidity:    ");
+            Serial.print(humidity, 2);
+            Serial.println(" %");
 
-        // Dew point approximation (Magnus formula)
-        float a = 17.27f;
-        float b = 237.7f;
-        float gamma = (a * temperature) / (b + temperature) + log(humidity / 100.0f);
-        float dewPoint = (b * gamma) / (a - gamma);
-        Serial.print("Dew Point:   ");
-        Serial.print(dewPoint, 2);
-        Serial.println(" °C");
+            // Dew point approximation (Magnus formula)
+            float a = 17.27f, b = 237.7f;
+            float gamma = (a * temperature) / (b + temperature)
+                        + log(humidity / 100.0f);
+            float dewPoint = (b * gamma) / (a - gamma);
+            Serial.print("Dew Point:   ");
+            Serial.print(dewPoint, 2);
+            Serial.println(" °C");
+        }
+
+        // Approximate altitude
+        float altitude = 44330.0f * (1.0f - pow(pressure / 1013.25f, 0.1903f));
+        Serial.print("Altitude:    ");
+        Serial.print(altitude, 2);
+        Serial.println(" m");
 
     } else {
         Serial.println("FAILED!");
@@ -96,7 +96,6 @@ void loop() {
     Serial.println(" seconds...");
     Serial.println("------------------------");
 
-    // The sensor is already in sleep mode (automatic after forced measurement)
-    // We just need to wait for the next measurement interval
+    // Sensor automatically returns to sleep mode after forced measurement
     delay(INTERVAL_MS);
 }
