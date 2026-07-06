@@ -26,8 +26,8 @@
     jmp !y, write_byte  side 0
 
 read_byte:
-    ; Release SDA so the slave can drive the data line
-    set pindirs, 1      side 0
+    ; Release SDA using OUT (OUT overrides previous OUT; SET can't override OUT)
+    out pindirs, 1      side 0
     set x, 7            side 0
 read_bit:
     nop                 side 1 [1]
@@ -46,8 +46,8 @@ write_bit:
     nop                 side 0 [1]
     nop                 side 0 [1]
     jmp x--, write_bit  side 0
-    ; Read ACK
-    set pindirs, 1      side 0 [1]
+    ; Read ACK (release SDA using OUT so it overrides previous bit)
+    out pindirs, 1      side 0 [1]
     nop                 side 1 [1]
     nop                 side 1 [1]
     in pins, 1          side 1
