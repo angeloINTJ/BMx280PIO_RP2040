@@ -19,7 +19,8 @@ void read_cal(Cal &cal){uint8_t b[26];sl();d5();cl();d5();wb(0xEC);wb(0x88);sl()
 float cT(Cal &cal,int32_t a,int32_t&tf){int32_t v1=((((a>>3)-((int32_t)cal.T1<<1)))*cal.T2)>>11;int32_t v2=(((((a>>4)-cal.T1)*((a>>4)-cal.T1))>>12)*cal.T3)>>14;tf=v1+v2;return(float)((tf*5+128)>>8)/100.0f;}
 float cP(Cal &cal,int32_t a,int32_t tf){double v1=(double)tf/2.0-64000.0;double v2=v1*v1*(double)cal.P6/32768.0;v2+=v1*(double)cal.P5*2.0;v2=v2/4.0+(double)cal.P4*65536.0;v1=((double)cal.P3*v1*v1/524288.0+(double)cal.P2*v1)/524288.0;v1=(1.0+v1/32768.0)*(double)cal.P1;if(v1==0.0)return 0.0f;double p=1048576.0-(double)a;p=(p-v2/4096.0)*6250.0/v1;v1=(double)cal.P9*p*p/2147483648.0;v2=p*(double)cal.P8/32768.0;p+=(v1+v2+(double)cal.P7)/16.0;return(float)(p/100.0);}
 
-void pio_read_reg(PIO pio,int sm,uint8_t reg,uint8_t *dst){
+// CORRECTED extraction: PIO shifts bits left by 1 due to spurious SCL pulse
+uint8_t pio_read(PIO pio,int sm,uint8_t reg){
     uint32_t buf[2]={0};int rx=dma_claim_unused_channel(false);dma_channel_config rc=dma_channel_get_default_config(rx);
     channel_config_set_transfer_data_size(&rc,DMA_SIZE_32);channel_config_set_read_increment(&rc,false);channel_config_set_write_increment(&rc,true);
     channel_config_set_dreq(&rc,pio_get_dreq(pio,sm,false));dma_channel_configure(rx,&rc,buf,&pio->rxf[sm],2,true);
@@ -27,60 +28,38 @@ void pio_read_reg(PIO pio,int sm,uint8_t reg,uint8_t *dst){
     int tx=dma_claim_unused_channel(false);dma_channel_config tc=dma_channel_get_default_config(tx);
     channel_config_set_transfer_data_size(&tc,DMA_SIZE_32);channel_config_set_read_increment(&tc,true);channel_config_set_write_increment(&tc,false);
     channel_config_set_dreq(&tc,pio_get_dreq(pio,sm,true));dma_channel_configure(tx,&tc,&pio->txf[sm],cmds,2,false);
-    pio_sm_set_enabled(pio,sm,true);dma_start_channel_mask((1u<<tx)|(1u<<rx));
-    while(dma_channel_is_busy(rx))tight_loop_contents();pio_sm_set_enabled(pio,sm,false);
-    *dst=rev8(buf[1]&0xFF);dma_channel_unclaim(tx);dma_channel_unclaim(rx);
+    pio_sm_set_enabled(pio,sm,true);dma_start_channel_mask((1u<<tx)|(1u<<rx));while(dma_channel_is_busy(rx))tight_loop_contents();pio_sm_set_enabled(pio,sm,false);
+    // CORRECTION: rev8 then shift right by 1 to undo spurious clock shift
+    uint8_t shifted=rev8(buf[1]&0xFF);
+    uint8_t corrected=(shifted>>1)&0xFF;
+    dma_channel_unclaim(tx);dma_channel_unclaim(rx);return corrected;
 }
 
 void setup(){
-    Serial.begin(115200);for(int i=0;i<60&&!Serial;i++)delay(100);delay(500);Serial.println("=== HYBRID: GPIO write + PIO read ===");
+    Serial.begin(115200);for(int i=0;i<60&&!Serial;i++)delay(100);delay(500);Serial.println("=== SHIFT-CORRECTED HYBRID ===");
     gpio_init(2);gpio_set_dir(2,GPIO_IN);gpio_pull_up(2);gpio_init(3);gpio_set_dir(3,GPIO_OUT);gpio_put(3,1);
     sl();d5();cl();d5();wb(0xEC);wb(0xE0);wb(0xB6);sl();d5();ch();d5();sh();d5();delay(20);
     sl();d5();cl();d5();wb(0xEC);wb(0xF4);wb(0x25);sl();d5();ch();d5();sh();d5();delay(50);
-    Cal cal;read_cal(cal);
-    Serial.print("Cal: T1=");Serial.print(cal.T1);Serial.print(" T2=");Serial.print(cal.T2);Serial.print(" T3=");Serial.print(cal.T3);Serial.print(" P1=");Serial.println(cal.P1);
+    Cal cal;read_cal(cal);Serial.print("Cal T1=");Serial.print(cal.T1);Serial.print(" P1=");Serial.println(cal.P1);
 
-    // Setup PIO
     PIO pio=pio0;int off=pio_add_program(pio,&i2c_master_program);int sm=pio_claim_unused_sm(pio,false);
     pio_sm_config c=i2c_master_program_get_default_config(off);
     sm_config_set_out_pins(&c,2,1);sm_config_set_set_pins(&c,2,1);sm_config_set_in_pins(&c,2);sm_config_set_sideset_pins(&c,3);
     sm_config_set_in_shift(&c,false,true,8);sm_config_set_clkdiv(&c,96.15f);
     pio_sm_init(pio,sm,off,&c);pio_sm_set_pindirs_with_mask(pio,sm,(1u<<3),(1u<<2)|(1u<<3));
+    gpio_pull_up(2);gpio_set_function(2,GPIO_FUNC_PIO0);gpio_set_function(3,GPIO_FUNC_PIO0);
 
-    for(int n=0;n<10;n++){
-        // Trigger via GPIO
+    for(int n=0;n<15;n++){
         sl();d5();cl();d5();wb(0xEC);wb(0xF4);wb(0x25);sl();d5();ch();d5();sh();d5();delay(50);
-
-        // === GPIO reference (full burst read) ===
-        uint8_t gr[8];
-        sl();d5();cl();d5();wb(0xEC);wb(0xF7);sl();d5();ch();d5();sh();d5();
-        sl();d5();cl();d5();wb(0xED);for(int i=0;i<8;i++)gr[i]=rb(i==7);sl();d5();ch();d5();sh();d5();
-        int32_t gaP=((int32_t)gr[0]<<12)|((int32_t)gr[1]<<4)|(gr[2]>>4);
-        int32_t gaT=((int32_t)gr[3]<<12)|((int32_t)gr[4]<<4)|(gr[5]>>4);
-        int32_t tf;float gt=cT(cal,gaT,tf);float gp=cP(cal,gaP,tf);
-
-        // === PIO read (one byte at a time via hybrid) ===
         uint8_t pr[8];
-        for(int i=0;i<8;i++){
-            uint8_t reg=0xF7+i;
-            // GPIO writes register address
-            sl();d5();cl();d5();wb(0xEC);wb(reg);sl();d5();ch();d5();sh();d5();
-            // PIO reads the byte
-            gpio_pull_up(2);gpio_set_function(2,GPIO_FUNC_PIO0);gpio_set_function(3,GPIO_FUNC_PIO0);
-            pio_read_reg(pio,sm,reg,&pr[i]);
-            // Back to GPIO
-            gpio_set_function(2,GPIO_FUNC_SIO);gpio_set_function(3,GPIO_FUNC_SIO);
-            gpio_set_dir(2,GPIO_IN);gpio_pull_up(2);gpio_set_dir(3,GPIO_OUT);gpio_put(3,1);
-        }
-        int32_t paP=((int32_t)pr[0]<<12)|((int32_t)pr[1]<<4)|(pr[2]>>4);
-        int32_t paT=((int32_t)pr[3]<<12)|((int32_t)pr[4]<<4)|(pr[5]>>4);
-        int32_t tf2;float pt=cT(cal,paT,tf2);float pp=cP(cal,paP,tf2);
-
-        Serial.print(n);Serial.print(": GPIO T=");Serial.print(gt,2);Serial.print("C P=");Serial.print(gp,2);Serial.print("hPa");
-        Serial.print("  PIO T=");Serial.print(pt,2);Serial.print("C P=");Serial.print(pp,2);Serial.print("hPa");
-        Serial.print("  Graw:");for(int i=0;i<8;i++){Serial.print(" ");Serial.print(gr[i],HEX);}
-        Serial.print("  Praw:");for(int i=0;i<8;i++){Serial.print(" ");Serial.print(pr[i],HEX);}
-        Serial.println();
+        for(int i=0;i<8;i++){uint8_t reg=0xF7+i;sl();d5();cl();d5();wb(0xEC);wb(reg);sl();d5();ch();d5();sh();d5();gpio_pull_up(2);gpio_set_function(2,GPIO_FUNC_PIO0);gpio_set_function(3,GPIO_FUNC_PIO0);pr[i]=pio_read(pio,sm,reg);gpio_set_function(2,GPIO_FUNC_SIO);gpio_set_function(3,GPIO_FUNC_SIO);gpio_set_dir(2,GPIO_IN);gpio_pull_up(2);gpio_set_dir(3,GPIO_OUT);gpio_put(3,1);}
+        int32_t aP=((int32_t)pr[0]<<12)|((int32_t)pr[1]<<4)|(pr[2]>>4);int32_t aT=((int32_t)pr[3]<<12)|((int32_t)pr[4]<<4)|(pr[5]>>4);
+        int32_t tf;float t=cT(cal,aT,tf);float p=cP(cal,aP,tf);
+        uint8_t gr[8];sl();d5();cl();d5();wb(0xEC);wb(0xF7);sl();d5();ch();d5();sh();d5();sl();d5();cl();d5();wb(0xED);for(int i=0;i<8;i++)gr[i]=rb(i==7);sl();d5();ch();d5();sh();d5();
+        int32_t gaP=((int32_t)gr[0]<<12)|((int32_t)gr[1]<<4)|(gr[2]>>4);int32_t gaT=((int32_t)gr[3]<<12)|((int32_t)gr[4]<<4)|(gr[5]>>4);
+        int32_t tf2;float gt=cT(cal,gaT,tf2);float gp=cP(cal,gaP,tf2);
+        Serial.print(n);Serial.print(": PIO T=");Serial.print(t,2);Serial.print("C P=");Serial.print(p,2);Serial.print("hPa  GPIO T=");Serial.print(gt,2);Serial.print("C P=");Serial.print(gp,2);
+        Serial.print("hPa  Praw:");for(int i=0;i<8;i++){Serial.print(" ");Serial.print(pr[i],HEX);}Serial.print("  Graw:");for(int i=0;i<8;i++){Serial.print(" ");Serial.print(gr[i],HEX);}Serial.println();
         delay(500);
     }
     Serial.println("DONE");
