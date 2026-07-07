@@ -1,6 +1,5 @@
 ;
 ; i2c.pio - I2C Master Bit-Bang Program for RP2040 PIO
-; Based on pico-examples (github.com/raspberrypi/pico-examples)
 ;
 ; Pin mapping:
 ;   OUT pin 0       = SDA direction (1 = drive low, 0 = release)
@@ -8,72 +7,79 @@
 ;   SET pin 0       = SDA direction (for set pindirs)
 ;   IN pin 0        = SDA input
 ;
-; Command word (16-bit, pushed to TX FIFO):
-;   Bit  0    = START flag  (1 = generate START before this byte)
+; Command word (16-bit, LSB-first shift from OSR):
+;   Bit  0    = START flag  (1 = generate START)
 ;   Bit  1    = READ flag   (1 = read from slave)
-;   Bits 9:2  = Data byte (for WRITE: ~rev8(data))
-;   Bit  10   = STOP flag   (1 = generate STOP after this byte)
+;   Bits 9:2  = Data byte for WRITE (~rev8(data))
+;   Bit  10   = STOP flag   (1 = generate STOP)
 ;
-; Note: The READ path consumes fewer OSR bits than the WRITE path,
-; causing the STOP flag to be read from the wrong bit position.
-; This means STOP is never generated after reads. The GPIO bit-bang
-; recovery in the C++ code handles bus reset between transactions.
-; A full PIO restructuring (future) would fix this properly.
+; Prologue: flags extracted via out y/out x BEFORE any SCL edge.
+; START generated conditionally with set pindirs + cleanup.
 
 .program i2c_master
 .side_set 1 opt
 
-    ; Pull with side 0: SCL stays LOW between chained commands.
-    pull block          side 0
+    ; ─── Prologue: extract flags, then conditionally generate START ────
+    pull block          side 0     ; 0: wait for command, SCL LOW
 
-    ; START: SDA low while SCL high (bit 0 → pindirs)
-    out pindirs, 1      side 1
+    ; Save START and READ flags without touching SCL
+    out y, 1            side 0     ; 1: Y = START (OSR bit 0)
+    out x, 1            side 0     ; 2: X = READ  (OSR bit 1)
 
-    ; READ/WRITE flag (bit 1 → Y)
-    out y, 1            side 0
-    jmp !y, write_byte  side 0
+    ; If START=0, skip — SCL never goes HIGH (no glitch!)
+    jmp !y, branch      side 0     ; 3: START=0 → branch
 
+    ; Generate START: SDA LOW while SCL HIGH
+    set pindirs, 1      side 1     ; 4: SCL↑ + SET drives SDA↓ = START
+    set pindirs, 0      side 0 [1] ; 5: release SET, SCL↓ (SDA floats again)
+
+    ; ─── Branch on READ flag ───────────────────────────────────────────
+branch:
+    jmp !x, write_byte  side 0     ; 6: READ=0 → write
+
+    ; ===================================================================
+    ; READ BYTE (OSR bits consumed so far: 2)
+    ; ===================================================================
 read_byte:
-    ; Release SDA using OUT (OUT overrides previous OUT; SET can't override OUT)
-    out pindirs, 1      side 0
-    set x, 7            side 0
+    out pindirs, 1      side 0     ; 7: release SDA (consumes bit 2)
+    set x, 7            side 0     ; 8: loop counter
 read_bit:
-    nop                 side 1 [1]
-    in pins, 1          side 1
-    nop                 side 0 [7]
-    nop                 side 0 [7]
-    jmp x--, read_bit   side 0
-    jmp check_stop      side 0
+    nop                 side 1 [1] ; 9: SCL HIGH
+    in pins, 1          side 1     ;10: sample SDA → ISR
+    nop                 side 0 [7] ;11: SCL LOW (8 cycles)
+    jmp x--, read_bit   side 0     ;12: loop 8 times
+    jmp check_stop      side 0     ;13:
 
+    ; ===================================================================
+    ; WRITE BYTE (OSR bits consumed so far: 2)
+    ; ===================================================================
 write_byte:
-    set x, 7            side 0
+    set x, 7            side 0     ;14: loop counter
 write_bit:
-    out pindirs, 1      side 0 [1]
-    nop                 side 1 [1]
-    nop                 side 1 [1]
-    nop                 side 0 [7]
-    nop                 side 0 [7]
-    jmp x--, write_bit  side 0
-    ; Read ACK (release SDA using OUT so it overrides previous bit)
-    out pindirs, 1      side 0 [1]
-    nop                 side 1 [1]
-    nop                 side 1 [1]
-    in pins, 1          side 1
-    nop                 side 0 [7]  ; extended SCL low: gives sensor time to process byte
-    push noblock        side 0 [7]  ; extra delay before next transaction
+    out pindirs, 1      side 0 [1] ;15: data bit → SDA
+    nop                 side 1 [1] ;16: SCL HIGH
+    nop                 side 1 [1] ;17: SCL HIGH
+    nop                 side 0 [7] ;18: SCL LOW (8 cycles, was 16)
+    jmp x--, write_bit  side 0     ;19: loop 8 times
+    ; Read ACK
+    out pindirs, 1      side 0 [1] ;20: release SDA
+    nop                 side 1 [1] ;21: SCL HIGH
+    nop                 side 1 [1] ;22: SCL HIGH
+    in pins, 1          side 1     ;23: sample ACK → ISR
+    nop                 side 0 [7] ;24: SCL LOW
+    push noblock        side 0 [7] ;25: push ACK to RX FIFO
 
+    ; ===================================================================
+    ; CHECK STOP / GENERATE STOP
+    ; ===================================================================
 check_stop:
-    out y, 1            side 0
-    jmp !y, done        side 0
-    ; STOP: SDA low, SCL high, SDA high
-    set pindirs, 1      side 0 [1]
-    nop                 side 1 [1]
-    nop                 side 1 [1]
-    set pindirs, 0      side 1 [1]
+    out y, 1            side 0     ;26: Y = STOP flag
+    jmp !y, done        side 0     ;27: no STOP → done
+    ; STOP: SDA LOW → SCL HIGH → SDA HIGH
+    set pindirs, 1      side 0 [1] ;28: drive SDA LOW
+    nop                 side 1 [1] ;29: SCL HIGH
+    set pindirs, 0      side 1 [1] ;30: release SDA while SCL HIGH = STOP
 
 done:
-    ; SCL stays LOW between chained bytes (no STOP).
-    ; [7] delay ensures minimum SCL low time ≥ 4.0 µs.
-    irq nowait 0        side 0 [7]
-
+    irq nowait 0        side 0 [7] ;31: SCL LOW between commands
 .wrap

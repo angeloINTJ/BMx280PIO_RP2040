@@ -19,34 +19,34 @@
 static const uint16_t i2c_master_program_instructions[] = {
             //     .wrap_target
     0x90a0, //  0: pull   block           side 0
-    0x7881, //  1: out    pindirs, 1      side 1
-    0x7041, //  2: out    y, 1            side 0
-    0x106c, //  3: jmp    !y, 12          side 0
-    0x7081, //  4: out    pindirs, 1      side 0
-    0xf027, //  5: set    x, 7            side 0
-    0xb942, //  6: nop                    side 1 [1]
-    0x5801, //  7: in     pins, 1         side 1
-    0xb742, //  8: nop                    side 0 [7]
-    0xb742, //  9: nop                    side 0 [7]
-    0x1046, // 10: jmp    x--, 6          side 0
-    0x1019, // 11: jmp    25              side 0
-    0xf027, // 12: set    x, 7            side 0
-    0x7181, // 13: out    pindirs, 1      side 0 [1]
-    0xb942, // 14: nop                    side 1 [1]
-    0xb942, // 15: nop                    side 1 [1]
-    0xb742, // 16: nop                    side 0 [7]
-    0xb742, // 17: nop                    side 0 [7]
-    0x104d, // 18: jmp    x--, 13         side 0
-    0x7181, // 19: out    pindirs, 1      side 0 [1]
-    0xb942, // 20: nop                    side 1 [1]
+    0x7041, //  1: out    y, 1            side 0
+    0x7021, //  2: out    x, 1            side 0
+    0x1066, //  3: jmp    !y, 6           side 0
+    0xf881, //  4: set    pindirs, 1      side 1
+    0xf180, //  5: set    pindirs, 0      side 0 [1]
+    0x102e, //  6: jmp    !x, 14          side 0
+    0x7081, //  7: out    pindirs, 1      side 0
+    0xf027, //  8: set    x, 7            side 0
+    0xb942, //  9: nop                    side 1 [1]
+    0x5801, // 10: in     pins, 1         side 1
+    0xb742, // 11: nop                    side 0 [7]
+    0x1049, // 12: jmp    x--, 9          side 0
+    0x101a, // 13: jmp    26              side 0
+    0xf027, // 14: set    x, 7            side 0
+    0x7181, // 15: out    pindirs, 1      side 0 [1]
+    0xb942, // 16: nop                    side 1 [1]
+    0xb942, // 17: nop                    side 1 [1]
+    0xb742, // 18: nop                    side 0 [7]
+    0x104f, // 19: jmp    x--, 15         side 0
+    0x7181, // 20: out    pindirs, 1      side 0 [1]
     0xb942, // 21: nop                    side 1 [1]
-    0x5801, // 22: in     pins, 1         side 1
-    0xb742, // 23: nop                    side 0 [7]
-    0x9700, // 24: push   noblock         side 0 [7]
-    0x7041, // 25: out    y, 1            side 0
-    0x107f, // 26: jmp    !y, 31          side 0
-    0xf181, // 27: set    pindirs, 1      side 0 [1]
-    0xb942, // 28: nop                    side 1 [1]
+    0xb942, // 22: nop                    side 1 [1]
+    0x5801, // 23: in     pins, 1         side 1
+    0xb742, // 24: nop                    side 0 [7]
+    0x9700, // 25: push   noblock         side 0 [7]
+    0x7041, // 26: out    y, 1            side 0
+    0x107f, // 27: jmp    !y, 31          side 0
+    0xf181, // 28: set    pindirs, 1      side 0 [1]
     0xb942, // 29: nop                    side 1 [1]
     0xf980, // 30: set    pindirs, 0      side 1 [1]
     0xd700, // 31: irq    nowait 0        side 0 [7]

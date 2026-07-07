@@ -255,11 +255,8 @@ void PIO_I2C::stopAutoScan() {
 }
 
 void PIO_I2C::extractBytes(const uint32_t *src, uint8_t *dst, size_t len) {
-    // PIO ISR accumulates I2C bits LSB-first → rev8 fixes ordering.
-    // A 1-cycle SCL HIGH pulse at out pindirs,1 side 1 between commands
-    // shifts the sensor's data by 1 bit → >> 1 compensates.
-    for (size_t i = 0; i < len; i++) {
-        uint8_t shifted = rev8(src[i] & 0xFF);
-        dst[i] = (shifted >> 1) & 0xFF;
-    }
+    // PIO ISR with shift_in_right=false stores MSB at ISR[7], LSB at ISR[0].
+    // The byte is already in correct I2C order — no bit reversal needed.
+    // SCL glitch eliminated by restructured PIO prologue (out y/x + set pindirs).
+    for (size_t i = 0; i < len; i++) dst[i] = src[i] & 0xFF;
 }

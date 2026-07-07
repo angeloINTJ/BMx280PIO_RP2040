@@ -29,12 +29,9 @@ uint8_t pio_read(PIO pio,int sm,uint8_t reg){
     channel_config_set_transfer_data_size(&tc,DMA_SIZE_32);channel_config_set_read_increment(&tc,true);channel_config_set_write_increment(&tc,false);
     channel_config_set_dreq(&tc,pio_get_dreq(pio,sm,true));dma_channel_configure(tx,&tc,&pio->txf[sm],cmds,2,false);
     pio_sm_set_enabled(pio,sm,true);dma_start_channel_mask((1u<<tx)|(1u<<rx));while(dma_channel_is_busy(rx))tight_loop_contents();pio_sm_set_enabled(pio,sm,false);
-    // PIO ISR stores bits LSB-first (rev8 needed).
-    // The PIO still has a 1-cycle SCL pulse at out pindirs,1 side 1
-    // between commands, which the BME280 sees as an extra clock edge.
-    // >> 1 compensates for this remaining shift.
-    uint8_t shifted=rev8(buf[1]&0xFF);
-    uint8_t corrected=(shifted>>1)&0xFF;
+    // PIO ISR with shift_in_right=false stores MSB at ISR[7], LSB at ISR[0].
+    // The byte is already in correct order — no rev8 needed!
+    uint8_t corrected=buf[1]&0xFF;
     dma_channel_unclaim(tx);dma_channel_unclaim(rx);return corrected;
 }
 
@@ -55,7 +52,7 @@ void setup(){
     for(int n=0;n<15;n++){
         sl();d5();cl();d5();wb(0xEC);wb(0xF4);wb(0x25);sl();d5();ch();d5();sh();d5();delay(50);
         uint8_t pr[8];
-        for(int i=0;i<8;i++){uint8_t reg=0xF7+i;sl();d5();cl();d5();wb(0xEC);wb(reg);sl();d5();ch();d5();sh();d5();gpio_pull_up(2);gpio_set_function(2,GPIO_FUNC_PIO0);gpio_set_function(3,GPIO_FUNC_PIO0);pr[i]=pio_read(pio,sm,reg);gpio_set_function(2,GPIO_FUNC_SIO);gpio_set_function(3,GPIO_FUNC_SIO);gpio_set_dir(2,GPIO_IN);gpio_pull_up(2);gpio_set_dir(3,GPIO_OUT);gpio_put(3,1);}
+        for(int i=0;i<8;i++){uint8_t reg=0xF7+i;sl();d5();cl();d5();wb(0xEC);wb(reg);sl();d5();ch();d5();sh();d5();gpio_pull_up(2);gpio_set_function(2,GPIO_FUNC_PIO0);gpio_set_function(3,GPIO_FUNC_PIO0);pr[i]=pio_read(pio,sm,reg);gpio_set_function(2,GPIO_FUNC_SIO);gpio_set_function(3,GPIO_FUNC_SIO);gpio_set_dir(2,GPIO_IN);gpio_pull_up(2);gpio_set_dir(3,GPIO_OUT);gpio_put(3,1);delayMicroseconds(5);gpio_put(3,0);delayMicroseconds(5);gpio_put(3,1);}
         int32_t aP=((int32_t)pr[0]<<12)|((int32_t)pr[1]<<4)|(pr[2]>>4);int32_t aT=((int32_t)pr[3]<<12)|((int32_t)pr[4]<<4)|(pr[5]>>4);
         int32_t tf;float t=cT(cal,aT,tf);float p=cP(cal,aP,tf);
         uint8_t gr[8];sl();d5();cl();d5();wb(0xEC);wb(0xF7);sl();d5();ch();d5();sh();d5();sl();d5();cl();d5();wb(0xED);for(int i=0;i<8;i++)gr[i]=rb(i==7);sl();d5();ch();d5();sh();d5();
