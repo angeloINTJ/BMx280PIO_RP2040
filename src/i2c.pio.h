@@ -48,7 +48,7 @@ static const uint16_t i2c_master_program_instructions[] = {
     0xf181, // 27: set    pindirs, 1      side 0 [1]
     0xb942, // 28: nop                    side 1 [1]
     0xb942, // 29: nop                    side 1 [1]
-    0xf981, // 30: set    pindirs, 1      side 1 [1]
+    0xf980, // 30: set    pindirs, 0      side 1 [1]
     0xd700, // 31: irq    nowait 0        side 0 [7]
             //     .wrap
 };
