@@ -67,6 +67,7 @@ private:
     // Helpers
     void _buildBurstCommands(uint8_t addr, uint8_t reg, size_t len);
     void _setupDMA();
+    void _setupPacer();     // Configure DMA CH3 (CTRL/Pacer) with ring buffer + PWM trigger
     void _setupPWM(uint32_t period_ms);
     bool _sendAddress(uint8_t addr, bool read);
     void _sendStop();

@@ -108,31 +108,76 @@ void PIO_I2C::_setupPWM(uint32_t period_ms) {
 }
 
 void PIO_I2C::_setupDMA() {
+    // ─── CH2 (RX): PIO RX FIFO → _burst_buf ring buffer ───────────────
+    // Continuous drain: reads 32-bit words from PIO RX FIFO, writes to
+    // RAM ring buffer. Ring size 5 = 32 bytes (8 words). The 11-word
+    // burst (3 ACKs + 8 data bytes) wraps; extraction must account for it.
     dma_channel_config c_rx = dma_channel_get_default_config(_dma_rx_chan);
     channel_config_set_transfer_data_size(&c_rx, DMA_SIZE_32);
     channel_config_set_read_increment(&c_rx, false);
     channel_config_set_write_increment(&c_rx, true);
-    channel_config_set_ring(&c_rx, true, 5);
+    channel_config_set_ring(&c_rx, true, 5);   // wrap write addr every 32 bytes
     channel_config_set_dreq(&c_rx, pio_get_dreq(_pio, _sm, false));
-    dma_channel_configure(_dma_rx_chan, &c_rx, _burst_buf, &_pio->rxf[_sm], 0xFFFFFFFF, true);
+    dma_channel_configure(_dma_rx_chan, &c_rx, _burst_buf,
+                          &_pio->rxf[_sm], 0xFFFFFFFF, true);
 
+    // ─── CH1 (TX): _cmd_buf → PIO TX FIFO ──────────────────────────────
+    // Sends _cmd_count command words to the PIO. Started manually for
+    // the initial burst; subsequent bursts are triggered by CH3 (pacer)
+    // writing to this channel's AL3_READ_ADDR_TRIG alias.
     dma_channel_config c_tx = dma_channel_get_default_config(_dma_tx_chan);
     channel_config_set_transfer_data_size(&c_tx, DMA_SIZE_32);
     channel_config_set_read_increment(&c_tx, true);
     channel_config_set_write_increment(&c_tx, false);
     channel_config_set_dreq(&c_tx, pio_get_dreq(_pio, _sm, true));
-    dma_channel_configure(_dma_tx_chan, &c_tx, &_pio->txf[_sm], _cmd_buf, _cmd_count, false);
+    dma_channel_configure(_dma_tx_chan, &c_tx, &_pio->txf[_sm],
+                          _cmd_buf, _cmd_count, false);
+}
 
-    _ctrl_data[0] = _cmd_count;
-    _ctrl_data[1] = (uint32_t)_cmd_buf;
+void PIO_I2C::_setupPacer() {
+    // ─── CH3 (CTRL/Pacer): Ring Buffer + PWM → CH1 Restart ─────────────
+    //
+    // Architecture:
+    //   PWM slice (wrap) ──DREQ──▶ DMA CH3 ──write──▶ CH1 alias registers
+    //                                  │
+    //                     _ctrl_data (ring buffer)
+    //                     [0] = transfer count
+    //                     [1] = source address
+    //
+    // Each PWM period triggers 2 sequential DMA transfers:
+    //   1. _ctrl_data[0] → CH1.AL3_TRANSFER_COUNT  (resets count, no trigger)
+    //   2. _ctrl_data[1] → CH1.AL3_READ_ADDR_TRIG  (resets addr + TRIGGERS CH1)
+    //
+    // The write-side ring wraps within the 2 alias registers (8 bytes),
+    // so every other PWM wrap restarts CH1. The read-side ring wraps
+    // within the 2-element _ctrl_data buffer.
+    //
+    // CH1 then sends _cmd_count commands to the PIO TX FIFO, the PIO
+    // executes the I2C burst, and CH2 drains the RX FIFO. This closes
+    // the zero-CPU-overhead continuous-sampling loop.
+
+    _ctrl_data[0] = _cmd_count;          // CH1 transfer count
+    _ctrl_data[1] = (uint32_t)_cmd_buf;  // CH1 source address
+
     dma_channel_config c_ctrl = dma_channel_get_default_config(_dma_ctrl_chan);
     channel_config_set_transfer_data_size(&c_ctrl, DMA_SIZE_32);
     channel_config_set_read_increment(&c_ctrl, true);
     channel_config_set_write_increment(&c_ctrl, true);
+
+    // Ring on read side: wraps within _ctrl_data (2 words = 8 bytes, size=3)
     channel_config_set_ring(&c_ctrl, false, 3);
+    // Ring on write side: wraps within CH1 alias registers
+    //   AL3_TRANSFER_COUNT (no trigger) → AL3_READ_ADDR_TRIG (triggers CH1)
     channel_config_set_ring(&c_ctrl, true, 3);
+
+    // Triggered by PWM slice wrap event
     channel_config_set_dreq(&c_ctrl, DREQ_PWM_WRAP0 + _pwm_slice);
-    dma_channel_configure(_dma_ctrl_chan, &c_ctrl, &dma_hw->ch[_dma_tx_chan].al3_transfer_count, _ctrl_data, 0xFFFFFFFF, false);
+
+    // Write target: CH1's AL3_TRANSFER_COUNT alias (first of 2 consecutive
+    // alias registers — the second is AL3_READ_ADDR_TRIG which triggers CH1).
+    dma_channel_configure(_dma_ctrl_chan, &c_ctrl,
+                          &dma_hw->ch[_dma_tx_chan].al3_transfer_count,
+                          _ctrl_data, 0xFFFFFFFF, false);
 }
 
 bool PIO_I2C::beginPIO(PIO pio) {
@@ -179,9 +224,18 @@ bool PIO_I2C::beginAutoScan(uint8_t addr, uint8_t reg, uint32_t *buf, size_t len
     gpio_pull_up(_sda);
     gpio_set_function(_sda, _pio == pio0 ? GPIO_FUNC_PIO0 : GPIO_FUNC_PIO1);
     gpio_set_function(_scl, _pio == pio0 ? GPIO_FUNC_PIO0 : GPIO_FUNC_PIO1);
-    _setupDMA();
+
+    _setupDMA();        // CH1 (TX) + CH2 (RX) — CH1 not started yet
+    _setupPacer();      // CH3 (CTRL) — ring buffer + PWM trigger
+
+    // Enable PIO SM first so it's ready to accept commands
     pio_sm_set_enabled(_pio, _sm, true);
-    dma_start_channel_mask(1u << _dma_ctrl_chan);
+
+    // Kick off the initial burst: CH1 sends commands, CH2 drains RX.
+    // Subsequent bursts are triggered by CH3 via PWM wrap → alias write.
+    dma_start_channel_mask((1u << _dma_tx_chan) | (1u << _dma_ctrl_chan));
+
+    // Enable PWM to start the periodic pacer for subsequent bursts
     pwm_set_enabled(_pwm_slice, true);
     _auto_scan = true; return true;
 }

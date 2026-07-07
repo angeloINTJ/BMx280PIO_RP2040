@@ -64,6 +64,11 @@ check_stop:
     set pindirs, 1      side 1 [1]
 
 done:
-    irq nowait 0        side 1
+    ; SCL stays LOW between chained bytes (no STOP).
+    ; [7] delay ensures minimum SCL low time ≥ 4.0 µs (BME280 spec).
+    ; The .wrap restarts from pull block, which asserts side 1
+    ; momentarily, but the DMA supplies the next command within
+    ; ~2 PIO cycles — a sub-µs glitch that the sensor tolerates.
+    irq nowait 0        side 0 [7]
 
 .wrap
