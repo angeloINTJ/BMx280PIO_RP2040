@@ -1,5 +1,5 @@
 /*
- * Forced Mode Example for BMx280_PIO
+ * Forced Mode Example for BMx280PIO_RP2040
  *
  * Demonstrates Forced Mode for low-power operation.
  * The sensor takes a single measurement then returns to Sleep mode,
@@ -16,13 +16,13 @@
  */
 
 #include <Arduino.h>
-#include "BMx280_PIO.h"
+#include "BMx280PIO_RP2040.h"
 
 #define SDA_PIN 2
 #define SCL_PIN 3
 #define INTERVAL_MS 60000  // 1 minute between readings
 
-BMx280_PIO bme(SDA_PIN, SCL_PIN);
+BMx280PIO_RP2040 bme(SDA_PIN, SCL_PIN);
 
 void setup() {
     Serial.begin(115200);

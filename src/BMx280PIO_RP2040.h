@@ -1,9 +1,9 @@
 /*
- * BMx280_PIO.h - BMP280/BME280 Sensor Driver for RP2040
+ * BMx280PIO_RP2040.h - BMP280/BME280 Sensor Driver for RP2040
  * Supports GPIO I2C, hardware Wire, and PIO+DMA auto-scan.
  */
-#ifndef BMx280_PIO_H
-#define BMx280_PIO_H
+#ifndef BMX280PIO_RP2040_H
+#define BMX280PIO_RP2040_H
 
 #include <Arduino.h>
 #include <Wire.h>
@@ -36,11 +36,11 @@
 #define BME280_STANDBY_500MS    0x04
 #define BME280_STANDBY_1000MS   0x05
 
-class BMx280_PIO {
+class BMx280PIO_RP2040 {
 public:
-    BMx280_PIO(TwoWire &wire, uint8_t addr = BME280_ADDR_PRIMARY);
-    BMx280_PIO(uint8_t sda, uint8_t scl, uint8_t addr = BME280_ADDR_PRIMARY, uint32_t freq = 100000);
-    ~BMx280_PIO();
+    BMx280PIO_RP2040(TwoWire &wire, uint8_t addr = BME280_ADDR_PRIMARY);
+    BMx280PIO_RP2040(uint8_t sda, uint8_t scl, uint8_t addr = BME280_ADDR_PRIMARY, uint32_t freq = 100000);
+    ~BMx280PIO_RP2040();
 
     bool begin();
     bool beginPIO(PIO pio = pio0);

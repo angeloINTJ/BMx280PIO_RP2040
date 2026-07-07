@@ -1,7 +1,7 @@
-# Syntax Highlighting for BMx280_PIO Library
+# Syntax Highlighting for BMx280PIO_RP2040 Library
 # See: https://arduino.github.io/arduino-cli/latest/library-specification/#keywords
 
-BMx280_PIO	KEYWORD1
+BMx280PIO_RP2040	KEYWORD1
 PIO_I2C	KEYWORD1
 
 begin	KEYWORD2

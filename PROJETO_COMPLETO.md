@@ -185,8 +185,8 @@ src/i2c.pio.h            — Header auto-gerado pelo pioasm
 src/i2c_burst.pio.h      — Header do programa customizado
 src/PIO_I2C.h            — API do driver (GPIO + PIO/DMA)
 src/PIO_I2C.cpp          — Implementação (bit-bang GPIO + PIO/DMA)
-src/BMx280_PIO.h         — Driver do sensor (compensação Bosch)
-src/BMx280_PIO.cpp       — Implementação do driver
+src/BMx280PIO_RP2040.h         — Driver do sensor (compensação Bosch)
+src/BMx280PIO_RP2040.cpp       — Implementação do driver
 src/main.cpp             — Programa de teste actual
 PIO_DMA_DEBUG_REPORT.md  — Relatório detalhado do debugging
 PLANO_FINAL.md           — Plano de arquitectura

@@ -193,8 +193,8 @@ pio/i2c_burst.pio          — Programa PIO (32 instruções)
 src/i2c_burst.pio.h        — Header auto-gerado pelo pioasm
 src/PIO_I2C.h              — API do driver I2C (GPIO + PIO/DMA)
 src/PIO_I2C.cpp            — Implementação (bit-bang GPIO + PIO/DMA)
-src/BMx280_PIO.h           — Driver do sensor BME280/BMP280
-src/BMx280_PIO.cpp         — Implementação (compensação Bosch + API async)
+src/BMx280PIO_RP2040.h           — Driver do sensor BME280/BMP280
+src/BMx280PIO_RP2040.cpp         — Implementação (compensação Bosch + API async)
 src/main.cpp               — Programa de teste
 ```
 

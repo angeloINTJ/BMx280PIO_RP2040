@@ -1,23 +1,23 @@
 /*
- * BMx280_PIO — Standalone Test (PlatformIO development only)
+ * BMx280PIO_RP2040 — Standalone Test (PlatformIO development only)
  *
- * Compiled only when -DBMX280_STANDALONE_TEST is defined (platformio.ini).
+ * Compiled only when -DBMX280PIO_RP2040_STANDALONE_TEST is defined (platformio.ini).
  * When installed as an Arduino/PlatformIO library dependency, this flag
  * is absent — the file compiles to an empty translation unit with no
  * conflicting setup()/loop() symbols.
  */
-#ifdef BMX280_STANDALONE_TEST
+#ifdef BMX280PIO_RP2040_STANDALONE_TEST
 
 #include <Arduino.h>
-#include "BMx280_PIO.h"
+#include "BMx280PIO_RP2040.h"
 
-BMx280_PIO bme(2, 3);
+BMx280PIO_RP2040 bme(2, 3);
 
 void setup() {
     Serial.begin(115200);
     while (!Serial) delay(100);
     delay(500);
-    Serial.println("BMx280_PIO Quick Test");
+    Serial.println("BMx280PIO_RP2040 Quick Test");
 
     if (!bme.begin()) {
         Serial.println("Sensor not found! Check wiring.");
@@ -40,4 +40,4 @@ void loop() {
     delay(2000);
 }
 
-#endif /* BMX280_STANDALONE_TEST */
+#endif /* BMX280PIO_RP2040_STANDALONE_TEST */

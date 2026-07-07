@@ -1,5 +1,5 @@
 /*
- * PIO+DMA Auto-Scan Example for BMx280_PIO
+ * PIO+DMA Auto-Scan Example for BMx280PIO_RP2040
  *
  * Demonstrates zero-CPU-overhead continuous sampling using the
  * 3-channel DMA engine (TX + RX + CTRL pacer).
@@ -18,13 +18,13 @@
  */
 
 #include <Arduino.h>
-#include "BMx280_PIO.h"
+#include "BMx280PIO_RP2040.h"
 
 #define SDA_PIN 2
 #define SCL_PIN 3
 #define SCAN_PERIOD_MS 1000  // Read sensor every 1 second
 
-BMx280_PIO bme(SDA_PIN, SCL_PIN);
+BMx280PIO_RP2040 bme(SDA_PIN, SCL_PIN);
 
 void setup() {
     Serial.begin(115200);

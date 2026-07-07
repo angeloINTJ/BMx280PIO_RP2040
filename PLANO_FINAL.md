@@ -102,7 +102,7 @@ cmds[10]= PIO_CMD(false, true,  true,  0);               // read byte 7 (NACK+ST
   - **C**: Modificar o programa PIO para NÃO pushar ACKs (remover `push noblock` após `in pins` no write path) — isso requer refazer o PIO e pode quebrar o limite de 32 instruções
 - O clock do PIO deve usar o divisor calculado: `div = sys_clk / (freq * 13.0)` onde freq=100000
 
-### 3. Atualizar `src/BMx280_PIO.cpp` e `.h`
+### 3. Atualizar `src/BMx280PIO_RP2040.cpp` e `.h`
 
 - Adaptar para usar o novo encoding de comandos
 - `extractBytes()`: com LSB-first input shift, o byte está em `word & 0xFF` (bits 7:0), não em `word >> 24`
@@ -120,8 +120,8 @@ cmds[10]= PIO_CMD(false, true,  true,  0);               // read byte 7 (NACK+ST
 | `src/i2c.pio.h` | ✅ Gerado | Já existe |
 | `src/PIO_I2C.h` | ❌ Precisa atualizar | Mudar macros para LSB-first 16-bit |
 | `src/PIO_I2C.cpp` | ❌ Precisa reescrever | Usar i2c.pio, ajustar DMA RX |
-| `src/BMx280_PIO.h` | ⚠️ Precisa ajustar | Simplificar API |
-| `src/BMx280_PIO.cpp` | ⚠️ Precisa ajustar | Adaptar extractBytes e comandos |
+| `src/BMx280PIO_RP2040.h` | ⚠️ Precisa ajustar | Simplificar API |
+| `src/BMx280PIO_RP2040.cpp` | ⚠️ Precisa ajustar | Adaptar extractBytes e comandos |
 | `src/main.cpp` | ❌ Precisa reescrever | Teste limpo com novo encoding |
 
 ## Configuração do PIO (Correta)

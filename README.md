@@ -1,4 +1,4 @@
-# BMx280_PIO — BMP280/BME280 Driver for RP2040
+# BMx280PIO_RP2040 — BMP280/BME280 Driver for RP2040
 
 [![PlatformIO](https://img.shields.io/badge/PlatformIO-compatible-orange.svg)](https://platformio.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
@@ -21,9 +21,9 @@ Arduino library for the **Bosch BMP280/BME280** environmental sensor on **RP2040
 
 ```cpp
 #include <Arduino.h>
-#include "BMx280_PIO.h"
+#include "BMx280PIO_RP2040.h"
 
-BMx280_PIO sensor(2, 3);  // SDA=GP2, SCL=GP3
+BMx280PIO_RP2040 sensor(2, 3);  // SDA=GP2, SCL=GP3
 
 void setup() {
     Serial.begin(115200);
@@ -71,7 +71,7 @@ Tested on BMP280 (chip ID 0x58) at address 0x76, GPIO2=SDA, GPIO3=SCL, 100 kHz I
 
 ```
 ┌────────────────────────────────────────────────────────────┐
-│  BMx280_PIO (sensor driver)                                │
+│  BMx280PIO_RP2040 (sensor driver)                                │
 │  - Bosch compensation formulas                             │
 │  - Auto-detection BMP280 vs BME280                         │
 │  - readAllAsync() — pure math on DMA ring buffer           │
@@ -178,12 +178,12 @@ This releases the sensor's SDA hold so the next START condition is clean.
 
 ```cpp
 // GPIO-based I2C (any pins)
-BMx280_PIO sensor(uint8_t sda, uint8_t scl,
+BMx280PIO_RP2040 sensor(uint8_t sda, uint8_t scl,
                   uint8_t addr = 0x76,
                   uint32_t freq = 100000);
 
 // Hardware I2C (Wire)
-BMx280_PIO sensor(TwoWire &wire, uint8_t addr = 0x76);
+BMx280PIO_RP2040 sensor(TwoWire &wire, uint8_t addr = 0x76);
 ```
 
 ### Configuration

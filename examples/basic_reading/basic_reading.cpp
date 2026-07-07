@@ -1,5 +1,5 @@
 /*
- * Basic Reading Example for BMx280_PIO
+ * Basic Reading Example for BMx280PIO_RP2040
  *
  * Reads temperature and pressure from a BMP280/BME280 sensor
  * using GPIO-based I2C on the RP2040. Outputs values to Serial.
@@ -17,13 +17,13 @@
  */
 
 #include <Arduino.h>
-#include "BMx280_PIO.h"
+#include "BMx280PIO_RP2040.h"
 
 // GPIO pins (any pair works)
 #define SDA_PIN 2
 #define SCL_PIN 3
 
-BMx280_PIO bme(SDA_PIN, SCL_PIN);
+BMx280PIO_RP2040 bme(SDA_PIN, SCL_PIN);
 
 void setup() {
     Serial.begin(115200);

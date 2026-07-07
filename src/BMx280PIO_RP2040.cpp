@@ -1,24 +1,24 @@
 /*
- * BMx280_PIO.cpp - BMP280/BME280 Sensor Driver
+ * BMx280PIO_RP2040.cpp - BMP280/BME280 Sensor Driver
  * Bosch compensation formulas. GPIO I2C + PIO+DMA auto-scan.
  */
-#include "BMx280_PIO.h"
+#include "BMx280PIO_RP2040.h"
 
-BMx280_PIO::BMx280_PIO(TwoWire &wire, uint8_t addr)
+BMx280PIO_RP2040::BMx280PIO_RP2040(TwoWire &wire, uint8_t addr)
     : _transport(TRANSPORT_WIRE), _wire(&wire), _pio_i2c(nullptr), _addr(addr),
       _init(false), _is_bme(false),
       _osrs_t(BME280_OS_1X), _osrs_p(BME280_OS_1X), _osrs_h(BME280_OS_1X),
       _filter(BME280_FILTER_OFF), _standby(BME280_STANDBY_250MS), _mode(BME280_MODE_SLEEP) {}
 
-BMx280_PIO::BMx280_PIO(uint8_t sda, uint8_t scl, uint8_t addr, uint32_t freq)
+BMx280PIO_RP2040::BMx280PIO_RP2040(uint8_t sda, uint8_t scl, uint8_t addr, uint32_t freq)
     : _transport(TRANSPORT_PIO), _wire(nullptr), _pio_i2c(new PIO_I2C(sda, scl, freq)),
       _addr(addr), _init(false), _is_bme(false),
       _osrs_t(BME280_OS_1X), _osrs_p(BME280_OS_1X), _osrs_h(BME280_OS_1X),
       _filter(BME280_FILTER_OFF), _standby(BME280_STANDBY_250MS), _mode(BME280_MODE_SLEEP) {}
 
-BMx280_PIO::~BMx280_PIO() { if (_pio_i2c) { _pio_i2c->end(); delete _pio_i2c; } }
+BMx280PIO_RP2040::~BMx280PIO_RP2040() { if (_pio_i2c) { _pio_i2c->end(); delete _pio_i2c; } }
 
-bool BMx280_PIO::_i2c_write(uint8_t reg, const uint8_t *data, size_t len) {
+bool BMx280PIO_RP2040::_i2c_write(uint8_t reg, const uint8_t *data, size_t len) {
     if (_transport == TRANSPORT_WIRE) {
         _wire->beginTransmission(_addr); _wire->write(reg);
         for (size_t i = 0; i < len; i++) _wire->write(data[i]);
@@ -29,7 +29,7 @@ bool BMx280_PIO::_i2c_write(uint8_t reg, const uint8_t *data, size_t len) {
         return _pio_i2c->write(_addr, buf, len + 1);
     }
 }
-bool BMx280_PIO::_i2c_read(uint8_t reg, uint8_t *data, size_t len) {
+bool BMx280PIO_RP2040::_i2c_read(uint8_t reg, uint8_t *data, size_t len) {
     if (_transport == TRANSPORT_WIRE) {
         _wire->beginTransmission(_addr); _wire->write(reg);
         if (_wire->endTransmission(false) != 0) return false;
@@ -42,7 +42,7 @@ bool BMx280_PIO::_i2c_read(uint8_t reg, uint8_t *data, size_t len) {
     }
 }
 
-bool BMx280_PIO::begin() {
+bool BMx280PIO_RP2040::begin() {
     if (_init) return true;
     if (_transport == TRANSPORT_PIO && !_pio_i2c->begin()) return false;
     uint8_t rst = BME280_RESET_VALUE;
@@ -57,7 +57,7 @@ bool BMx280_PIO::begin() {
     _init = true; return true;
 }
 
-bool BMx280_PIO::_loadCalibration() {
+bool BMx280PIO_RP2040::_loadCalibration() {
     uint8_t b[26];
     if (!_i2c_read(0x88, b, 26)) return false;
     _T1 = b[0]|(b[1]<<8); _T2 = b[2]|(b[3]<<8); _T3 = b[4]|(b[5]<<8);
@@ -75,7 +75,7 @@ bool BMx280_PIO::_loadCalibration() {
     return true;
 }
 
-void BMx280_PIO::_applyConfig() {
+void BMx280PIO_RP2040::_applyConfig() {
     uint8_t d;
     if (_is_bme) { d = _osrs_h & 0x07; _i2c_write(BME280_REG_CTRL_HUM, &d, 1); }
     d = ((_osrs_t & 0x07) << 5) | ((_osrs_p & 0x07) << 2) | (_mode & 0x03);
@@ -84,7 +84,7 @@ void BMx280_PIO::_applyConfig() {
     _i2c_write(BME280_REG_CONFIG, &d, 1);
 }
 
-void BMx280_PIO::setMode(uint8_t mode) {
+void BMx280PIO_RP2040::setMode(uint8_t mode) {
     _mode = mode & 0x03;
     if (!_init) return;
     uint8_t d; _i2c_read(BME280_REG_CTRL_MEAS, &d, 1);
@@ -92,24 +92,24 @@ void BMx280_PIO::setMode(uint8_t mode) {
     _i2c_write(BME280_REG_CTRL_MEAS, &d, 1);
 }
 
-uint8_t BMx280_PIO::readRegister(uint8_t reg) {
+uint8_t BMx280PIO_RP2040::readRegister(uint8_t reg) {
     uint8_t v = 0; _i2c_read(reg, &v, 1); return v;
 }
-void BMx280_PIO::writeRegister(uint8_t reg, uint8_t value) {
+void BMx280PIO_RP2040::writeRegister(uint8_t reg, uint8_t value) {
     _i2c_write(reg, &value, 1);
 }
-void BMx280_PIO::readRegisters(uint8_t reg, uint8_t *data, size_t len) {
+void BMx280PIO_RP2040::readRegisters(uint8_t reg, uint8_t *data, size_t len) {
     _i2c_read(reg, data, len);
 }
 
-uint8_t BMx280_PIO::_measTime() {
+uint8_t BMx280PIO_RP2040::_measTime() {
     const uint8_t m[] = {0, 1, 2, 4, 8, 16};
     uint32_t t = 1250 + 2300 * m[_osrs_t & 0x07] + 2300 * m[_osrs_p & 0x07] + 575;
     if (_is_bme) t += 2300 * m[_osrs_h & 0x07] + 575;
     return (uint8_t)((t + 1500) / 1000);
 }
 
-bool BMx280_PIO::takeForcedMeasurement() {
+bool BMx280PIO_RP2040::takeForcedMeasurement() {
     if (!_init) return false;
     setMode(BME280_MODE_FORCED);
     sleep_ms(_measTime());
@@ -123,7 +123,7 @@ bool BMx280_PIO::takeForcedMeasurement() {
     return true;
 }
 
-void BMx280_PIO::_readRaw(int32_t *t, int32_t *p, int32_t *h) {
+void BMx280PIO_RP2040::_readRaw(int32_t *t, int32_t *p, int32_t *h) {
     uint8_t d[8];
     _i2c_read(BME280_REG_PRESS_MSB, d, 8);
     if (p) *p = ((int32_t)d[0]<<12)|((int32_t)d[1]<<4)|(d[2]>>4);
@@ -132,7 +132,7 @@ void BMx280_PIO::_readRaw(int32_t *t, int32_t *p, int32_t *h) {
     else if (h) *h = 0;
 }
 
-float BMx280_PIO::readTemperature() {
+float BMx280PIO_RP2040::readTemperature() {
     if (!_init) return NAN;
     int32_t adc_T; _readRaw(&adc_T, nullptr, nullptr);
     int32_t v1 = ((((adc_T>>3)-((int32_t)_T1<<1)))*_T2)>>11;
@@ -140,7 +140,7 @@ float BMx280_PIO::readTemperature() {
     _t_fine = v1 + v2;
     return (float)((_t_fine*5+128)>>8)/100.0f;
 }
-float BMx280_PIO::readPressure() {
+float BMx280PIO_RP2040::readPressure() {
     if (!_init) return NAN;
     int32_t adc_T, adc_P; _readRaw(&adc_T, &adc_P, nullptr);
     readTemperature();
@@ -158,7 +158,7 @@ float BMx280_PIO::readPressure() {
     p += (v1+v2+(double)_P7)/16.0;
     return (float)(p/100.0);
 }
-float BMx280_PIO::readHumidity() {
+float BMx280PIO_RP2040::readHumidity() {
     if (!_init||!_is_bme) return 0.0f;
     int32_t adc_T, adc_H; _readRaw(&adc_T, nullptr, &adc_H);
     readTemperature();
@@ -169,7 +169,7 @@ float BMx280_PIO::readHumidity() {
     v1 = v1<0?0:v1; v1 = v1>419430400?419430400:v1;
     return (float)((uint32_t)(v1>>12))/1024.0f;
 }
-void BMx280_PIO::readAll(float *t, float *p, float *h) {
+void BMx280PIO_RP2040::readAll(float *t, float *p, float *h) {
     if (!_init) { if(t)*t=NAN; if(p)*p=NAN; if(h)*h=NAN; return; }
     int32_t aT,aP,aH; _readRaw(&aT,&aP,&aH);
     int32_t tv1=((((aT>>3)-((int32_t)_T1<<1)))*_T2)>>11;
@@ -206,12 +206,12 @@ void BMx280_PIO::readAll(float *t, float *p, float *h) {
 
 // ─── PIO+DMA Auto-Scan ─────────────────────────────────────────────────
 
-bool BMx280_PIO::beginPIO(PIO pio) {
+bool BMx280PIO_RP2040::beginPIO(PIO pio) {
     if (!_init||_transport!=TRANSPORT_PIO||!_pio_i2c) return false;
     return _pio_i2c->beginPIO(pio);
 }
 
-bool BMx280_PIO::beginAutoScan(uint32_t period_ms) {
+bool BMx280PIO_RP2040::beginAutoScan(uint32_t period_ms) {
     if (!_pio_i2c||!_pio_i2c->isPIOActive()) return false;
     setMode(BME280_MODE_NORMAL);
     if (period_ms >= 1000) _standby = BME280_STANDBY_1000MS;
@@ -221,13 +221,13 @@ bool BMx280_PIO::beginAutoScan(uint32_t period_ms) {
     return _pio_i2c->beginAutoScan(_addr, BME280_REG_PRESS_MSB, _raw_async, 8, period_ms);
 }
 
-void BMx280_PIO::stopAutoScan() {
+void BMx280PIO_RP2040::stopAutoScan() {
     if (!_pio_i2c) return;
     _pio_i2c->stopAutoScan();
     setMode(BME280_MODE_SLEEP);
 }
 
-void BMx280_PIO::readAllAsync(float *t, float *p, float *h) {
+void BMx280PIO_RP2040::readAllAsync(float *t, float *p, float *h) {
     if (!_init) { if(t)*t=NAN; if(p)*p=NAN; if(h)*h=NAN; return; }
 
     // ─── Extract 8 data bytes from DMA ring buffer ───────────────────
@@ -288,4 +288,4 @@ void BMx280_PIO::readAllAsync(float *t, float *p, float *h) {
     }
 }
 
-uint8_t BMx280_PIO::getChipID() { uint8_t v=0;_i2c_read(BME280_REG_CHIP_ID,&v,1);return v; }
+uint8_t BMx280PIO_RP2040::getChipID() { uint8_t v=0;_i2c_read(BME280_REG_CHIP_ID,&v,1);return v; }
