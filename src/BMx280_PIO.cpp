@@ -92,6 +92,16 @@ void BMx280_PIO::setMode(uint8_t mode) {
     _i2c_write(BME280_REG_CTRL_MEAS, &d, 1);
 }
 
+uint8_t BMx280_PIO::readRegister(uint8_t reg) {
+    uint8_t v = 0; _i2c_read(reg, &v, 1); return v;
+}
+void BMx280_PIO::writeRegister(uint8_t reg, uint8_t value) {
+    _i2c_write(reg, &value, 1);
+}
+void BMx280_PIO::readRegisters(uint8_t reg, uint8_t *data, size_t len) {
+    _i2c_read(reg, data, len);
+}
+
 uint8_t BMx280_PIO::_measTime() {
     const uint8_t m[] = {0, 1, 2, 4, 8, 16};
     uint32_t t = 1250 + 2300 * m[_osrs_t & 0x07] + 2300 * m[_osrs_p & 0x07] + 575;

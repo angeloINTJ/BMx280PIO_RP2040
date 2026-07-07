@@ -45,8 +45,20 @@ public:
     bool begin();
     bool beginPIO(PIO pio = pio0);
 
+    // Configuration (safe to call before or after begin())
+    void setTemperatureOversampling(uint8_t os) { _osrs_t = os & 0x07; if (_init) _applyConfig(); }
+    void setPressureOversampling(uint8_t os)    { _osrs_p = os & 0x07; if (_init) _applyConfig(); }
+    void setHumidityOversampling(uint8_t os)    { _osrs_h = os & 0x07; if (_init) _applyConfig(); }
+    void setFilter(uint8_t filter)              { _filter = filter & 0x07; if (_init) _applyConfig(); }
+    void setStandbyTime(uint8_t standby)        { _standby = standby & 0x07; if (_init) _applyConfig(); }
+
     void setMode(uint8_t mode);
     bool takeForcedMeasurement();
+
+    // Direct register access
+    uint8_t readRegister(uint8_t reg);
+    void writeRegister(uint8_t reg, uint8_t value);
+    void readRegisters(uint8_t reg, uint8_t *data, size_t len);
 
     float readTemperature();
     float readPressure();

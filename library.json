@@ -29,7 +29,7 @@
   "frameworks": "arduino",
   "platforms": "raspberrypi",
   "headers": [
-    "BME280_PIO.h",
+    "BMx280_PIO.h",
     "PIO_I2C.h"
   ],
   "examples": [
@@ -42,6 +42,16 @@
       "name": "Forced Mode",
       "base": "examples/forced_mode",
       "files": ["forced_mode.cpp"]
+    },
+    {
+      "name": "PIO+DMA Auto-Scan",
+      "base": "examples/auto_scan",
+      "files": ["auto_scan.cpp"]
+    },
+    {
+      "name": "PIO+DMA Hybrid Test",
+      "base": "examples/pio_dma_hybrid",
+      "files": ["pio_dma_hybrid.cpp"]
     }
   ],
   "dependencies": {
