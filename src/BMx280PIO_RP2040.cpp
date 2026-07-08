@@ -1,6 +1,9 @@
-/*
- * BMx280PIO_RP2040.cpp - BMP280/BME280 Sensor Driver
- * Bosch compensation formulas. GPIO I2C + PIO+DMA auto-scan.
+/**
+ * @file BMx280PIO_RP2040.cpp
+ * @brief BMP280/BME280 sensor driver implementation.
+ *
+ * Bosch compensation formulas (double-precision pressure, integer temperature).
+ * Supports GPIO bit-bang I2C, hardware Wire, and PIO+DMA burst reads.
  */
 #include "BMx280PIO_RP2040.h"
 

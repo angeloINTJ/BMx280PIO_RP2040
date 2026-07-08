@@ -1,21 +1,24 @@
 ;
-; i2c.pio - I2C Master Bit-Bang Program for RP2040 PIO
+; @file i2c.pio
+; @brief I2C Master Bit-Bang State Machine for RP2040 PIO (31 instructions).
 ;
 ; Pin mapping:
-;   OUT pin 0       = SDA direction (1 = drive low, 0 = release)
+;   OUT pin 0       = SDA direction (1 = drive low, 0 = release/Hi-Z)
 ;   Side-set pin 0  = SCL level (0 = low, 1 = high)
-;   SET pin 0       = SDA direction (for set pindirs)
-;   IN pin 0        = SDA input
+;   SET pin 0       = SDA direction (set pindirs for START/ACK)
+;   IN pin 0        = SDA input (read data and ACK bits)
 ;
 ; Command word (16-bit, LSB-first shift from OSR):
-;   Bit  0    = START flag  (1 = generate START)
-;   Bit  1    = READ flag   (1 = read from slave)
+;   Bit  0    = START flag  (1 = generate START before this byte)
+;   Bit  1    = READ flag   (1 = read from slave, 0 = write)
 ;   Bits 9:2  = Data byte for WRITE (~rev8(data))
-;   Bit  10   = STOP flag   (1 = generate STOP)
+;   Bit  10   = STOP flag   (1 = generate STOP after this byte)
 ;
-; Prologue: flags extracted via out y/out x BEFORE any SCL edge.
-; START generated conditionally with set pindirs + cleanup.
-; READ path sends NACK after each byte (9th SCL pulse).
+; Key design decisions:
+; - Flags extracted via out y/x BEFORE any SCL edge (zero glitch for START=0)
+; - START generated conditionally with set pindirs + set pindirs,0 cleanup
+; - ACK pulse after each read byte (SDA setup before SCL rise, 3 instructions)
+; - ACK read removed from WRITE path (ISR stays clean for next command)
 
 .program i2c_master
 .side_set 1 opt

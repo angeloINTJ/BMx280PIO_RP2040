@@ -1,3 +1,11 @@
+/**
+ * @file PIO_I2C.cpp
+ * @brief I2C master transport implementation — GPIO bit-bang + PIO+DMA burst.
+ *
+ * GPIO mode uses open-drain emulation via direction toggling on any pin pair.
+ * PIO+DMA mode uses the i2c.pio state machine with manual DMA register writes
+ * (workaround for SDK dma_channel_configure TX count bug).
+ */
 #include "PIO_I2C.h"
 #include <hardware/gpio.h>
 #include <hardware/clocks.h>

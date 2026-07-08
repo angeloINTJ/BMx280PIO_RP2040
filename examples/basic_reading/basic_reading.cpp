@@ -1,6 +1,6 @@
-/*
- * Basic Reading Example for BMx280PIO_RP2040
- *
+/**
+ * @example Basic Reading Example for BMx280PIO_RP2040
+ * @brief
  * Reads temperature and pressure from a BMP280/BME280 sensor
  * using GPIO-based I2C on the RP2040. Outputs values to Serial.
  *

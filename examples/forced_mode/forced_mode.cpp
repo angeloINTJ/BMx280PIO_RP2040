@@ -1,6 +1,6 @@
-/*
- * Forced Mode Example for BMx280PIO_RP2040
- *
+/**
+ * @example Forced Mode Example for BMx280PIO_RP2040
+ * @brief
  * Demonstrates Forced Mode for low-power operation.
  * The sensor takes a single measurement then returns to Sleep mode,
  * consuming minimal power between readings.

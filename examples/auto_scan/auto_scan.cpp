@@ -1,11 +1,9 @@
-/*
- * PIO+DMA Burst Read Example for BMx280PIO_RP2040
+/**
+ * @example auto_scan.cpp
+ * @brief PIO+DMA burst read example — reads all registers via PIO state machine.
  *
- * Demonstrates PIO+DMA accelerated sensor reading using burstRead().
- * The PIO state machine executes the I2C burst autonomously while
- * DMA transfers commands and data. The CPU only runs compensation math.
- *
- * Wiring: Sensor VCC→3.3V, GND→GND, SDA→GPIO2, SCL→GPIO3
+ * Demonstrates beginPIO() + readAll() using burstRead() for fast I2C reads.
+ * Wiring: Sensor VCC→3.3V, GND→GND, SDA→GPIO2, SCL→GPIO3.
  */
 
 #include <Arduino.h>
