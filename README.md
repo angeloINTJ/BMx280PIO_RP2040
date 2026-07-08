@@ -7,17 +7,19 @@ Arduino library for the **Bosch BMP280/BME280** environmental sensor on **RP2040
 
 ## Features
 
-- ✅ Temperature, pressure, humidity (BME280) — **verified on hardware**
-- ✅ **PIO+DMA auto-scan** — 3-channel DMA, readings in background, CPU only runs math
+- ✅ Temperature ±0.01°C, pressure ±0.12 hPa — **verified on hardware**
+- ✅ **PIO+DMA burst reads** — 8 registers in a single I2C transaction via PIO
 - ✅ GPIO bit-bang I2C on any pin pair (open-drain emulation)
 - ✅ Auto-detects BMP280 vs BME280 by chip ID
 - ✅ Sleep, Forced, and Normal operating modes
 - ✅ Configurable oversampling: 1× to 16× per channel
 - ✅ IIR filter and standby time configuration
 - ✅ Bosch datasheet compensation (double-precision)
-- ✅ PlatformIO & Arduino IDE compatible
+- ✅ PlatformIO & Arduino IDE compatible (library.properties, keywords.txt)
 
 ## Quick Start
+
+### GPIO I2C (simplest)
 
 ```cpp
 #include <Arduino.h>
@@ -25,22 +27,32 @@ Arduino library for the **Bosch BMP280/BME280** environmental sensor on **RP2040
 
 BMx280PIO_RP2040 sensor(2, 3);  // SDA=GP2, SCL=GP3
 
-void setup() {
-    Serial.begin(115200);
-
-    if (!sensor.begin()) {
-        Serial.println("Sensor not found!");
-        while (1);
-    }
-    Serial.print("Detected: ");
-    Serial.println(sensor.isBME280() ? "BME280" : "BMP280");
-}
-
+void setup() { Serial.begin(115200); sensor.begin(); }
 void loop() {
     sensor.takeForcedMeasurement();
-    float t, p, h;
-    sensor.readAll(&t, &p, &h);
-    Serial.printf("T=%.2f°C  P=%.2fhPa  H=%.2f%%\n", t, p, h);
+    float t, p, h; sensor.readAll(&t, &p, &h);
+    Serial.printf("T=%.2f°C P=%.2fhPa\n", t, p);
+    delay(2000);
+}
+```
+
+### PIO+DMA Burst Read (high performance)
+
+```cpp
+#include <Arduino.h>
+#include "BMx280PIO_RP2040.h"
+
+BMx280PIO_RP2040 sensor(2, 3);
+
+void setup() {
+    Serial.begin(115200);
+    sensor.begin();
+    sensor.beginPIO(pio0);  // Load PIO program — enables burst reads
+}
+void loop() {
+    sensor.takeForcedMeasurement();
+    float t, p, h; sensor.readAll(&t, &p, &h);  // PIO+DMA burst
+    Serial.printf("T=%.2f°C P=%.2fhPa\n", t, p);
     delay(2000);
 }
 ```
@@ -58,14 +70,15 @@ void loop() {
 
 ## Hardware Test Results
 
-Tested on BMP280 (chip ID 0x58) at address 0x76, GPIO2=SDA, GPIO3=SCL, 100 kHz I2C.
+Tested on BMP280 (chip ID 0x58) at address 0x76, GPIO2=SDA, GPIO3=SCL.
 
-| Method | Temperature | Pressure | CPU Load |
-|--------|-------------|----------|----------|
-| GPIO bit-bang | 18.17°C | 1017.01 hPa | Low (blocking) |
-| **PIO+DMA** | **18.17°C** | **1017.01 hPa** | **Zero** (background) |
+| Method | Temperature | Pressure | Notes |
+|--------|-------------|----------|-------|
+| GPIO bit-bang | 18.15°C | 1017.17 hPa | Baseline reference |
+| **PIO+DMA burst** | **18.15°C** | **1017.17 hPa** | **Exact match** |
+| Hybrid PIO+GPIO | 18.15°C | 1017.17 hPa | Per-register PIO reads |
 
-**PIO and GPIO readings match identically** — verified across 15 consecutive samples.
+All four examples (`basic_reading`, `forced_mode`, `auto_scan`, `pio_dma_hybrid`) tested and working on hardware.
 
 ## Architecture
 
@@ -105,9 +118,26 @@ Tested on BMP280 (chip ID 0x58) at address 0x76, GPIO2=SDA, GPIO3=SCL, 100 kHz I
 └────────────────────────────────────────────────────────────┘
 ```
 
-### DMA CH3 Pacer (Continuous Auto-Scan)
+### PIO+DMA Burst Read (`burstRead`)
 
-The pacer enables true zero-CPU background sampling:
+When PIO is loaded via `beginPIO()`, the library routes `_i2c_read()` through
+`PIO_I2C::burstRead()`, which executes a complete I2C burst transaction:
+
+1. DMA CH1 sends 11 command words to the PIO TX FIFO
+2. The PIO processes: START + write register + RESTART + read 8 bytes
+3. DMA CH2 drains the 8 data bytes from the RX FIFO into a buffer
+4. The CPU extracts the bytes and runs Bosch compensation
+
+Key implementation details:
+- **Manual DMA register writes** — work around SDK `dma_channel_configure()` TX count bug
+- **DMA enable after PIO SM start** — ensures DREQ signals are active
+- **ACK pulse with SDA setup time** — 3-instruction sequence drives SDA LOW before SCL rises
+- **PIO prologue restructured** — START/READ flags extracted via `out y/x` before any SCL edge, eliminating glitches
+
+### DMA CH3 Pacer (Continuous Auto-Scan) — Experimental
+
+The pacer architecture enables zero-CPU background sampling:
+(This mode is implemented but not yet validated on hardware.)
 
 ```
 PWM slice 7 (wrap) ──DREQ──► DMA CH3 ──write──► CH1 alias registers
@@ -155,22 +185,28 @@ branch:
 
 ### Data Extraction: No Bit Reversal Needed
 
-**Critical discovery**: The PIO ISR with `shift_in_right=false` stores the first received bit (I2C MSB) at ISR[7] and the last received bit (I2C LSB) at ISR[0]. The byte is **already in correct I2C order** — no `rev8()` is needed.
+The PIO ISR with `shift_in_right=false` stores the first received bit (I2C MSB)
+at ISR[7] and the last received bit (I2C LSB) at ISR[0]. The byte is **already
+in correct I2C order** — no `rev8()` is needed.
 
-Extraction is simply: `dst[i] = src[i] & 0xFF`
+Extraction is simply: `dst[i] = rxbuf[i] & 0xFF`
 
-### SCL Recovery Pulse
+### Dual-Core Logic Analyzer
 
-The READ path in the PIO skips the 9th SCL pulse (ACK/NACK bit), leaving the sensor driving SDA. After each PIO read, the GPIO code sends a recovery pulse to complete the transaction:
+During development, a powerful debugging technique was used: **Core 1 as a logic
+analyzer**. Core 1 samples SDA/SCL via `sio_hw->gpio_in` at ~5 MHz into a 4K
+ring buffer while Core 0 runs the PIO+DMA burst. This revealed:
 
-```cpp
-// After pio_read(), before next GPIO operation:
-gpio_put(SCL, 1); delayMicroseconds(5);  // 9th SCL rising edge
-gpio_put(SCL, 0); delayMicroseconds(5);  // SCL low
-gpio_put(SCL, 1);                         // return to idle
-```
+- The `dma_channel_configure()` TX transfer count bug (register always read 0)
+- The missing ACK setup time (SDA and SCL changing in the same PIO cycle)
+- The DMA enable ordering issue (DREQ not active before PIO SM starts)
 
-This releases the sensor's SDA hold so the next START condition is clean.
+### SCL Recovery
+
+The PIO sends an ACK pulse (SDA LOW during 9th SCL) after each read byte,
+keeping the sensor in streaming mode for multi-byte reads. After the burst
+completes, `burstRead()` generates a GPIO SCL recovery pulse to ensure the
+bus returns to idle state.
 
 ## API Reference
 
@@ -227,6 +263,17 @@ bool isInitialized();            // True if sensor ready
 | **Sleep** | ~0.1 µA | Sensor idle, registers preserved |
 | **Forced** | ~0.5–3 µA avg | Single measurement, auto-return to sleep |
 | **Normal** | ~3–5 µA | Continuous measurement, configurable interval |
+
+## Known Limitations
+
+1. **DMA CH3 Pacer (continuous auto-scan)**: Architecture implemented but not yet
+   validated on hardware. The `beginAutoScan()` + `readAllAsync()` path compiles
+   correctly but data extraction from the continuous ring buffer needs validation.
+2. **STOP after reads**: The READ path reads the STOP flag from the wrong OSR bit
+   position. The GPIO recovery in `burstRead()` handles bus cleanup.
+3. **First reading offset**: The first byte of the first reading after forced mode
+   may have a slightly offset pressure MSB. This is a sensor characteristic.
+4. **RP2040-only**: Requires the PIO peripheral, exclusive to RP2040/RP2350.
 
 ## Technical Notes
 
