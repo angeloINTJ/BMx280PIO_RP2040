@@ -230,27 +230,18 @@ void BMx280PIO_RP2040::stopAutoScan() {
 void BMx280PIO_RP2040::readAllAsync(float *t, float *p, float *h) {
     if (!_init) { if(t)*t=NAN; if(p)*p=NAN; if(h)*h=NAN; return; }
 
-    // ─── Extract 8 data bytes from DMA ring buffer ───────────────────
-    // CH2 uses ring size 5 (32 bytes = 8 words). The 11-word burst
-    // (3 ACKs + 8 data bytes) wraps: data bytes 5,6,7 land at
-    // positions 0,1,2 while data bytes 0..4 stay at positions 3..7.
-    //
-    // Layout after burst (ring-wrapped):
-    //   _raw_async[0]=data5, [1]=data6, [2]=data7,
-    //   _raw_async[3]=data0, [4]=data1, [5]=data2, [6]=data3, [7]=data4
-    //
-    // Note: For continuous multi-burst operation, the start offset
-    // shifts each burst. A PIO IRQ handler should track the ring
-    // write pointer for robust synchronization.
-    // ISR stores MSB at bit 7, LSB at bit 0 — already correct byte order.
-    _raw_bytes[0] = _raw_async[3] & 0xFF;  // data byte 0
-    _raw_bytes[1] = _raw_async[4] & 0xFF;  // data byte 1
-    _raw_bytes[2] = _raw_async[5] & 0xFF;  // data byte 2
-    _raw_bytes[3] = _raw_async[6] & 0xFF;  // data byte 3
-    _raw_bytes[4] = _raw_async[7] & 0xFF;  // data byte 4
-    _raw_bytes[5] = _raw_async[0] & 0xFF;  // data byte 5 (wrapped)
-    _raw_bytes[6] = _raw_async[1] & 0xFF;  // data byte 6 (wrapped)
-    _raw_bytes[7] = _raw_async[2] & 0xFF;  // data byte 7 (wrapped)
+    // RX FIFO has exactly 8 words (data bytes only — ACKs not pushed).
+    // CH2 writes them sequentially to _raw_async[0..7]. No wrap, no offset.
+    if (_pio_i2c) _pio_i2c->resetRxBuffer();
+
+    _raw_bytes[0] = _raw_async[0] & 0xFF;
+    _raw_bytes[1] = _raw_async[1] & 0xFF;
+    _raw_bytes[2] = _raw_async[2] & 0xFF;
+    _raw_bytes[3] = _raw_async[3] & 0xFF;
+    _raw_bytes[4] = _raw_async[4] & 0xFF;
+    _raw_bytes[5] = _raw_async[5] & 0xFF;
+    _raw_bytes[6] = _raw_async[6] & 0xFF;
+    _raw_bytes[7] = _raw_async[7] & 0xFF;
 
     int32_t aP = ((int32_t)_raw_bytes[0]<<12)|((int32_t)_raw_bytes[1]<<4)|(_raw_bytes[2]>>4);
     int32_t aT = ((int32_t)_raw_bytes[3]<<12)|((int32_t)_raw_bytes[4]<<4)|(_raw_bytes[5]>>4);

@@ -1,11 +1,6 @@
 /*
  * PIO+DMA Auto-Scan Example for BMx280PIO_RP2040
  *
- * ⚠️ EXPERIMENTAL — The DMA ring buffer extraction is not yet fully
- * validated on hardware. Use basic_reading or forced_mode for
- * production. This example demonstrates the architecture and
- * compiles correctly, but readAllAsync() returns incorrect data.
- *
  * Demonstrates zero-CPU-overhead continuous sampling using the
  * 3-channel DMA engine (TX + RX + CTRL pacer).
  *
@@ -70,6 +65,9 @@ void setup() {
     Serial.print(SCAN_PERIOD_MS);
     Serial.println(" ms period)");
     Serial.println("I2C bit-bang runs in background — CPU free!\n");
+
+    // Wait for the first DMA burst to complete before reading
+    delay(SCAN_PERIOD_MS + 100);
 }
 
 void loop() {

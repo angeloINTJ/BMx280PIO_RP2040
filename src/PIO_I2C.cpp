@@ -260,3 +260,13 @@ void PIO_I2C::extractBytes(const uint32_t *src, uint8_t *dst, size_t len) {
     // SCL glitch eliminated by restructured PIO prologue (out y/x + set pindirs).
     for (size_t i = 0; i < len; i++) dst[i] = src[i] & 0xFF;
 }
+
+void PIO_I2C::resetRxBuffer() {
+    // Reset CH2 (RX DMA) write address to the start of the ring buffer.
+    // Called by readAllAsync() to ensure extraction starts at position 0.
+    // This is a CPU register write — fast (< 1 µs) and race-free since
+    // the ring buffer is only read from the CPU side.
+    if (_dma_rx_chan >= 0 && _burst_buf) {
+        dma_channel_set_write_addr(_dma_rx_chan, _burst_buf, false);
+    }
+}

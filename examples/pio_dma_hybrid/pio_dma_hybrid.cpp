@@ -21,17 +21,16 @@ float cP(Cal &cal,int32_t a,int32_t tf){double v1=(double)tf/2.0-64000.0;double 
 
 // CORRECTED extraction: PIO shifts bits left by 1 due to spurious SCL pulse
 uint8_t pio_read(PIO pio,int sm,uint8_t reg){
-    uint32_t buf[2]={0};int rx=dma_claim_unused_channel(false);dma_channel_config rc=dma_channel_get_default_config(rx);
+    uint32_t buf=0;int rx=dma_claim_unused_channel(false);dma_channel_config rc=dma_channel_get_default_config(rx);
     channel_config_set_transfer_data_size(&rc,DMA_SIZE_32);channel_config_set_read_increment(&rc,false);channel_config_set_write_increment(&rc,true);
-    channel_config_set_dreq(&rc,pio_get_dreq(pio,sm,false));dma_channel_configure(rx,&rc,buf,&pio->rxf[sm],2,true);
+    channel_config_set_dreq(&rc,pio_get_dreq(pio,sm,false));dma_channel_configure(rx,&rc,&buf,&pio->rxf[sm],1,true);
     uint32_t cmds[2];cmds[0]=mk(1,0,0,0xED);cmds[1]=mk(0,1,1,0xFF);
     int tx=dma_claim_unused_channel(false);dma_channel_config tc=dma_channel_get_default_config(tx);
     channel_config_set_transfer_data_size(&tc,DMA_SIZE_32);channel_config_set_read_increment(&tc,true);channel_config_set_write_increment(&tc,false);
     channel_config_set_dreq(&tc,pio_get_dreq(pio,sm,true));dma_channel_configure(tx,&tc,&pio->txf[sm],cmds,2,false);
     pio_sm_set_enabled(pio,sm,true);dma_start_channel_mask((1u<<tx)|(1u<<rx));while(dma_channel_is_busy(rx))tight_loop_contents();pio_sm_set_enabled(pio,sm,false);
-    // PIO ISR with shift_in_right=false stores MSB at ISR[7], LSB at ISR[0].
-    // The byte is already in correct order — no rev8 needed!
-    uint8_t corrected=buf[1]&0xFF;
+    // RX FIFO has 1 word (data byte only — ACK push removed).
+    uint8_t corrected=buf&0xFF;
     dma_channel_unclaim(tx);dma_channel_unclaim(rx);return corrected;
 }
 

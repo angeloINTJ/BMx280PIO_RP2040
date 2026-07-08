@@ -15,6 +15,7 @@
 ;
 ; Prologue: flags extracted via out y/out x BEFORE any SCL edge.
 ; START generated conditionally with set pindirs + cleanup.
+; READ path sends NACK after each byte (9th SCL pulse).
 
 .program i2c_master
 .side_set 1 opt
@@ -22,64 +23,61 @@
     ; ─── Prologue: extract flags, then conditionally generate START ────
     pull block          side 0     ; 0: wait for command, SCL LOW
 
-    ; Save START and READ flags without touching SCL
     out y, 1            side 0     ; 1: Y = START (OSR bit 0)
     out x, 1            side 0     ; 2: X = READ  (OSR bit 1)
 
-    ; If START=0, skip — SCL never goes HIGH (no glitch!)
     jmp !y, branch      side 0     ; 3: START=0 → branch
 
     ; Generate START: SDA LOW while SCL HIGH
     set pindirs, 1      side 1     ; 4: SCL↑ + SET drives SDA↓ = START
-    set pindirs, 0      side 0 [1] ; 5: release SET, SCL↓ (SDA floats again)
+    set pindirs, 0      side 0 [1] ; 5: release SET, SCL↓
 
     ; ─── Branch on READ flag ───────────────────────────────────────────
 branch:
     jmp !x, write_byte  side 0     ; 6: READ=0 → write
 
     ; ===================================================================
-    ; READ BYTE (OSR bits consumed so far: 2)
+    ; READ BYTE + NACK (9th SCL pulse)
     ; ===================================================================
 read_byte:
     out pindirs, 1      side 0     ; 7: release SDA (consumes bit 2)
     set x, 7            side 0     ; 8: loop counter
 read_bit:
     nop                 side 1 [1] ; 9: SCL HIGH
-    in pins, 1          side 1     ;10: sample SDA → ISR
-    nop                 side 0 [7] ;11: SCL LOW (8 cycles)
+    in pins, 1          side 1     ;10: sample SDA → ISR (autopush at 8)
+    nop                 side 0 [7] ;11: SCL LOW
     jmp x--, read_bit   side 0     ;12: loop 8 times
-    jmp check_stop      side 0     ;13:
+    ; Send NACK (master releases SDA = NACK) + 9th SCL pulse
+    out pindirs, 1      side 0 [1] ;13: release SDA (NACK)
+    nop                 side 1 [1] ;14: SCL HIGH (9th pulse)
+    jmp check_stop      side 0     ;15:
 
     ; ===================================================================
-    ; WRITE BYTE (OSR bits consumed so far: 2)
+    ; WRITE BYTE + ACK check
     ; ===================================================================
 write_byte:
-    set x, 7            side 0     ;14: loop counter
+    set x, 7            side 0     ;16: loop counter
 write_bit:
-    out pindirs, 1      side 0 [1] ;15: data bit → SDA
-    nop                 side 1 [1] ;16: SCL HIGH
-    nop                 side 1 [1] ;17: SCL HIGH
-    nop                 side 0 [7] ;18: SCL LOW (8 cycles, was 16)
-    jmp x--, write_bit  side 0     ;19: loop 8 times
-    ; Read ACK
-    out pindirs, 1      side 0 [1] ;20: release SDA
-    nop                 side 1 [1] ;21: SCL HIGH
-    nop                 side 1 [1] ;22: SCL HIGH
-    in pins, 1          side 1     ;23: sample ACK → ISR
-    nop                 side 0 [7] ;24: SCL LOW
-    push noblock        side 0 [7] ;25: push ACK to RX FIFO
+    out pindirs, 1      side 0 [1] ;17: data bit → SDA
+    nop                 side 1 [1] ;18: SCL HIGH
+    nop                 side 0 [7] ;19: SCL LOW
+    jmp x--, write_bit  side 0     ;20: loop 8 times
+    ; ACK clock pulse (sensor needs 9th SCL, value not read)
+    out pindirs, 1      side 0 [1] ;21: release SDA
+    nop                 side 1 [1] ;22: SCL HIGH (9th pulse)
+    nop                 side 0 [7] ;23: SCL LOW (ISR stays clean!)
 
     ; ===================================================================
     ; CHECK STOP / GENERATE STOP
     ; ===================================================================
 check_stop:
-    out y, 1            side 0     ;26: Y = STOP flag
-    jmp !y, done        side 0     ;27: no STOP → done
+    out y, 1            side 0     ;25: Y = STOP flag
+    jmp !y, done        side 0     ;26: no STOP → done
     ; STOP: SDA LOW → SCL HIGH → SDA HIGH
-    set pindirs, 1      side 0 [1] ;28: drive SDA LOW
-    nop                 side 1 [1] ;29: SCL HIGH
-    set pindirs, 0      side 1 [1] ;30: release SDA while SCL HIGH = STOP
+    set pindirs, 1      side 0 [1] ;27: drive SDA LOW
+    nop                 side 1 [1] ;28: SCL HIGH
+    set pindirs, 0      side 1 [1] ;29: release SDA while SCL HIGH = STOP
 
 done:
-    irq nowait 0        side 0 [7] ;31: SCL LOW between commands
+    nop                 side 0 [7] ;30: SCL LOW between commands
 .wrap

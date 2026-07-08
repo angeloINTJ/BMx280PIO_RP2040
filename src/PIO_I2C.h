@@ -46,6 +46,9 @@ public:
     // Extract bytes from 32-bit DMA words (LSB-first: byte in bits 7:0)
     static void extractBytes(const uint32_t *src, uint8_t *dst, size_t len);
 
+    // Reset RX DMA channel write address to buffer start (call before reading ring buffer)
+    void resetRxBuffer();
+
 private:
     uint8_t  _sda, _scl;
     uint32_t _freq;
