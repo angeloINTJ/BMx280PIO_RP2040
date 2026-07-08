@@ -261,6 +261,60 @@ void PIO_I2C::extractBytes(const uint32_t *src, uint8_t *dst, size_t len) {
     for (size_t i = 0; i < len; i++) dst[i] = src[i] & 0xFF;
 }
 
+bool PIO_I2C::burstRead(uint8_t addr, uint8_t reg, uint8_t *dst, size_t len) {
+    if (!_pio_active || _dma_tx_chan < 0 || _dma_rx_chan < 0) return false;
+    if (len > 8) len = 8;
+
+    _cmd_count = 0;
+    _cmd_buf[_cmd_count++] = mk_cmd(true,  false, false, addr << 1);
+    _cmd_buf[_cmd_count++] = mk_cmd(false, false, false, reg);
+    _cmd_buf[_cmd_count++] = mk_cmd(true,  false, false, (addr << 1) | 1);
+    for (size_t i = 0; i < len - 1; i++)
+        _cmd_buf[_cmd_count++] = mk_cmd(false, true, false, 0xFF);
+    _cmd_buf[_cmd_count++] = mk_cmd(false, true, true, 0xFF);
+
+    uint32_t rxbuf[8] = {0};
+
+    dma_channel_config c_rx = dma_channel_get_default_config(_dma_rx_chan);
+    channel_config_set_transfer_data_size(&c_rx, DMA_SIZE_32);
+    channel_config_set_read_increment(&c_rx, false);
+    channel_config_set_write_increment(&c_rx, true);
+    channel_config_set_dreq(&c_rx, pio_get_dreq(_pio, _sm, false));
+    dma_channel_configure(_dma_rx_chan, &c_rx, rxbuf, &_pio->rxf[_sm], len, true);
+
+    dma_channel_config c_tx = dma_channel_get_default_config(_dma_tx_chan);
+    channel_config_set_transfer_data_size(&c_tx, DMA_SIZE_32);
+    channel_config_set_read_increment(&c_tx, true);
+    channel_config_set_write_increment(&c_tx, false);
+    channel_config_set_dreq(&c_tx, pio_get_dreq(_pio, _sm, true));
+    dma_channel_configure(_dma_tx_chan, &c_tx, &_pio->txf[_sm], _cmd_buf, _cmd_count, false);
+
+    pio_sm_clear_fifos(_pio, _sm);
+    pio_sm_restart(_pio, _sm);
+    gpio_set_function(_sda, _pio == pio0 ? GPIO_FUNC_PIO0 : GPIO_FUNC_PIO1);
+    gpio_set_function(_scl, _pio == pio0 ? GPIO_FUNC_PIO0 : GPIO_FUNC_PIO1);
+    gpio_pull_up(_sda);
+
+    pio_sm_set_enabled(_pio, _sm, true);
+    dma_start_channel_mask(1u << _dma_tx_chan);
+    while (dma_channel_is_busy(_dma_tx_chan)) tight_loop_contents();
+    while (dma_channel_is_busy(_dma_rx_chan)) tight_loop_contents();
+    pio_sm_set_enabled(_pio, _sm, false);
+
+    gpio_set_function(_scl, GPIO_FUNC_SIO);
+    gpio_set_dir(_scl, GPIO_OUT);
+    gpio_put(_scl, 1); delayMicroseconds(5);
+    gpio_put(_scl, 0); delayMicroseconds(5);
+    gpio_put(_scl, 1);
+
+    gpio_set_function(_sda, GPIO_FUNC_SIO);
+    gpio_set_dir(_sda, GPIO_IN);
+    gpio_pull_up(_sda);
+
+    for (size_t i = 0; i < len; i++) dst[i] = rxbuf[i] & 0xFF;
+    return true;
+}
+
 void PIO_I2C::resetRxBuffer() {
     // Reset CH2 (RX DMA) write address to the start of the ring buffer.
     // Called by readAllAsync() to ensure extraction starts at position 0.

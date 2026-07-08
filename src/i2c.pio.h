@@ -31,8 +31,8 @@ static const uint16_t i2c_master_program_instructions[] = {
     0x5801, // 10: in     pins, 1         side 1
     0xb742, // 11: nop                    side 0 [7]
     0x1049, // 12: jmp    x--, 9          side 0
-    0x7181, // 13: out    pindirs, 1      side 0 [1]
-    0xb942, // 14: nop                    side 1 [1]
+    0xf881, // 13: set    pindirs, 1      side 1
+    0xf180, // 14: set    pindirs, 0      side 0 [1]
     0x1018, // 15: jmp    24              side 0
     0xf027, // 16: set    x, 7            side 0
     0x7181, // 17: out    pindirs, 1      side 0 [1]

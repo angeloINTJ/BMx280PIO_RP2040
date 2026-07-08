@@ -37,6 +37,8 @@ bool BMx280PIO_RP2040::_i2c_read(uint8_t reg, uint8_t *data, size_t len) {
         size_t n = _wire->available();
         for (size_t i = 0; i < n && i < len; i++) data[i] = _wire->read();
         return n == len;
+    } else if (_pio_i2c->isPIOActive()) {
+        return _pio_i2c->burstRead(_addr, reg, data, len);
     } else {
         return _pio_i2c->writeThenRead(_addr, &reg, 1, data, len);
     }
