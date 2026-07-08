@@ -275,19 +275,28 @@ bool PIO_I2C::burstRead(uint8_t addr, uint8_t reg, uint8_t *dst, size_t len) {
 
     uint32_t rxbuf[8] = {0};
 
-    dma_channel_config c_rx = dma_channel_get_default_config(_dma_rx_chan);
-    channel_config_set_transfer_data_size(&c_rx, DMA_SIZE_32);
-    channel_config_set_read_increment(&c_rx, false);
-    channel_config_set_write_increment(&c_rx, true);
-    channel_config_set_dreq(&c_rx, pio_get_dreq(_pio, _sm, false));
-    dma_channel_configure(_dma_rx_chan, &c_rx, rxbuf, &_pio->rxf[_sm], len, true);
+    // Abort any previous DMA, then manually configure registers
+    // (dma_channel_configure was not reliably setting TX transfer count)
+    dma_channel_abort(_dma_tx_chan);
+    dma_channel_abort(_dma_rx_chan);
 
-    dma_channel_config c_tx = dma_channel_get_default_config(_dma_tx_chan);
-    channel_config_set_transfer_data_size(&c_tx, DMA_SIZE_32);
-    channel_config_set_read_increment(&c_tx, true);
-    channel_config_set_write_increment(&c_tx, false);
-    channel_config_set_dreq(&c_tx, pio_get_dreq(_pio, _sm, true));
-    dma_channel_configure(_dma_tx_chan, &c_tx, &_pio->txf[_sm], _cmd_buf, _cmd_count, false);
+    dma_channel_hw_t *rx_hw = &dma_hw->ch[_dma_rx_chan];
+    rx_hw->read_addr  = (uint32_t)&_pio->rxf[_sm];
+    rx_hw->write_addr = (uint32_t)rxbuf;
+    rx_hw->transfer_count = len;
+    rx_hw->ctrl_trig = DMA_CH0_CTRL_TRIG_DATA_SIZE_BITS |
+                       DMA_CH0_CTRL_TRIG_INCR_WRITE_BITS |
+                       (pio_get_dreq(_pio, _sm, false) << DMA_CH0_CTRL_TRIG_TREQ_SEL_LSB) |
+                       DMA_CH0_CTRL_TRIG_EN_BITS;
+
+    dma_channel_hw_t *tx_hw = &dma_hw->ch[_dma_tx_chan];
+    tx_hw->read_addr  = (uint32_t)_cmd_buf;
+    tx_hw->write_addr = (uint32_t)&_pio->txf[_sm];
+    tx_hw->transfer_count = _cmd_count;
+    tx_hw->ctrl_trig = DMA_CH0_CTRL_TRIG_DATA_SIZE_BITS |
+                       DMA_CH0_CTRL_TRIG_INCR_READ_BITS |
+                       (pio_get_dreq(_pio, _sm, true) << DMA_CH0_CTRL_TRIG_TREQ_SEL_LSB) |
+                       DMA_CH0_CTRL_TRIG_EN_BITS;
 
     pio_sm_clear_fifos(_pio, _sm);
     pio_sm_restart(_pio, _sm);
@@ -296,7 +305,6 @@ bool PIO_I2C::burstRead(uint8_t addr, uint8_t reg, uint8_t *dst, size_t len) {
     gpio_pull_up(_sda);
 
     pio_sm_set_enabled(_pio, _sm, true);
-    dma_start_channel_mask(1u << _dma_tx_chan);
     while (dma_channel_is_busy(_dma_tx_chan)) tight_loop_contents();
     while (dma_channel_is_busy(_dma_rx_chan)) tight_loop_contents();
     pio_sm_set_enabled(_pio, _sm, false);
