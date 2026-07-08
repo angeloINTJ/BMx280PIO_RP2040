@@ -47,10 +47,11 @@ read_bit:
     in pins, 1          side 1     ;10: sample SDA → ISR (autopush at 8)
     nop                 side 0 [7] ;11: SCL LOW
     jmp x--, read_bit   side 0     ;12: loop 8 times
-    ; Send ACK (SDA LOW during 9th SCL) so sensor keeps sending data
-    set pindirs, 1      side 1     ;13: drive SDA LOW + SCL HIGH = ACK
-    set pindirs, 0      side 0 [1] ;14: release SET, SCL LOW
-    jmp check_stop      side 0     ;15:
+    ; Send ACK (SDA LOW during 9th SCL) — setup SDA before SCL rises
+    set pindirs, 1      side 0     ;13: drive SDA LOW, SCL stays LOW (setup)
+    nop                 side 1 [1] ;14: SCL HIGH (ACK clock — sensor samples SDA=0)
+    set pindirs, 0      side 0 [1] ;15: release SDA, SCL LOW
+    jmp check_stop      side 0     ;16:
 
     ; ===================================================================
     ; WRITE BYTE + ACK check

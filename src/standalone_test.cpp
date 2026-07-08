@@ -1,12 +1,7 @@
-/*
- * BMx280PIO_RP2040 — Standalone Test (PlatformIO)
- * Only compiled with -DBMX280PIO_RP2040_STANDALONE_TEST
- */
 #ifdef BMX280PIO_RP2040_STANDALONE_TEST
 #include <Arduino.h>
 #include "BMx280PIO_RP2040.h"
 BMx280PIO_RP2040 bme(2, 3);
-
 void setup() {
     Serial.begin(115200); while(!Serial) delay(100); delay(500);
     Serial.println("BMx280PIO_RP2040 Test");
