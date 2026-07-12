@@ -51,19 +51,22 @@ bool BMx280PIO_RP2040::_i2c_write(uint8_t reg, const uint8_t *data, size_t len) 
 
 bool BMx280PIO_RP2040::_i2c_read(uint8_t reg, uint8_t *data, size_t len) {
     if (_wirepio) {
-        // Use raw GPIO bit-bang for reads — proven to work with BMP280.
-        // WirePIO is used for writes only.
+        // Read one byte at a time via raw GPIO. Multi-byte bursts fail
+        // after ~2 bytes due to ACK timing; single-byte reads are reliable.
+        // WirePIO handles writes only.
         uint8_t sd = _sda, sc = _scl; uint32_t f = _freq;
-        gpio_init(sd); gpio_set_dir(sd, GPIO_IN); gpio_pull_up(sd);
-        gpio_init(sc); gpio_set_dir(sc, GPIO_OUT); gpio_put(sc, 1);
-        start(sd, sc, f);
-        if (!wr(sd, sc, f, (uint8_t)(_addr << 1))) { stop(sd, sc, f); return false; }
-        if (!wr(sd, sc, f, reg)) { stop(sd, sc, f); return false; }
-        stop(sd, sc, f);
-        start(sd, sc, f);
-        if (!wr(sd, sc, f, (uint8_t)((_addr << 1) | 1))) { stop(sd, sc, f); return false; }
-        for (size_t i = 0; i < len; i++) data[i] = rd(sd, sc, f, i == len - 1);
-        stop(sd, sc, f);
+        for (size_t i = 0; i < len; i++) {
+            gpio_init(sd); gpio_set_dir(sd, GPIO_IN); gpio_pull_up(sd);
+            gpio_init(sc); gpio_set_dir(sc, GPIO_OUT); gpio_put(sc, 1);
+            start(sd, sc, f);
+            if (!wr(sd, sc, f, (uint8_t)(_addr << 1))) { stop(sd, sc, f); return false; }
+            if (!wr(sd, sc, f, (uint8_t)(reg + i))) { stop(sd, sc, f); return false; }
+            stop(sd, sc, f);
+            start(sd, sc, f);
+            if (!wr(sd, sc, f, (uint8_t)((_addr << 1) | 1))) { stop(sd, sc, f); return false; }
+            data[i] = rd(sd, sc, f, true);
+            stop(sd, sc, f);
+        }
         return true;
     } else {
         _wire->beginTransmission(_addr); _wire->write(reg);
