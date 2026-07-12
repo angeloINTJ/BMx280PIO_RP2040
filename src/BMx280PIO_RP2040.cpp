@@ -51,13 +51,9 @@ bool BMx280PIO_RP2040::_i2c_write(uint8_t reg, const uint8_t *data, size_t len) 
 
 bool BMx280PIO_RP2040::_i2c_read(uint8_t reg, uint8_t *data, size_t len) {
     if (_wirepio) {
-        // Try WirePIO's burstRead (single PIO+DMA burst for write+read).
-        // Falls back to single-byte GPIO reads if burstRead is unavailable
-        // or fails (e.g. PIO not active, DMA channel conflict).
-        size_t n = _wirepio->burstRead(_addr, reg, data, len);
-        if (n == len) return true;
-
-        // Fallback: single-byte GPIO reads
+        // Read one byte at a time via raw GPIO. Multi-byte bursts fail
+        // after ~2 bytes due to ACK timing; single-byte reads are reliable.
+        // WirePIO handles writes only.
         uint8_t sd = _sda, sc = _scl; uint32_t f = _freq;
         for (size_t i = 0; i < len; i++) {
             gpio_init(sd); gpio_set_dir(sd, GPIO_IN); gpio_pull_up(sd);
@@ -94,7 +90,8 @@ bool BMx280PIO_RP2040::begin() {
     if (!_i2c_read(BME280_REG_CHIP_ID, &cid, 1)) return false;
     _is_bme = (cid == BME280_CHIP_ID_VALUE);
     if (cid != BMP280_CHIP_ID && cid != BME280_CHIP_ID_VALUE) return false;
-    if (!_loadCalibration()) return false;
+    if (!_loadCalibration()) { Serial.println("CAL FAIL"); return false; }
+
     _applyConfig();
     _init = true; return true;
 }
