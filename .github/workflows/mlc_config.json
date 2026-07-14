@@ -1,0 +1,12 @@
+{
+  "ignorePatterns": [
+    {
+      "pattern": "^https://badges\\.registry\\.platformio\\.org"
+    },
+    {
+      "pattern": "^https://github\\.com/angeloINTJ/BMx280PIO_RP2040/actions"
+    }
+  ],
+  "replacementPatterns": [],
+  "httpHeaders": []
+}

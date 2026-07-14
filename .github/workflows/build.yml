@@ -1,0 +1,51 @@
+name: Build
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        example:
+          - basic_reading
+          - forced_mode
+          - auto_scan
+          - multi_sensor
+          - standalone_test
+          - benchmark
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.platformio
+            ~/.cache/pip
+          key: ${{ runner.os }}-pio-${{ hashFiles('platformio.ini') }}
+          restore-keys: |
+            ${{ runner.os }}-pio-
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install PlatformIO
+        run: pip install platformio
+
+      - name: Install library dependencies
+        run: |
+          pio pkg install --library "WirePIO" || true
+
+      - name: Build library
+        run: pio run
+
+      - name: Build example (${{ matrix.example }})
+        run: |
+          cd examples/${{ matrix.example }}
+          pio run

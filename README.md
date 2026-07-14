@@ -1,5 +1,9 @@
+[🇧🇷 Ler em Português](README.pt-BR.md)
+
 # BMx280PIO_RP2040 — BMP280/BME280 Driver for RP2040
 
+[![Build](https://github.com/angeloINTJ/BMx280PIO_RP2040/actions/workflows/build.yml/badge.svg)](https://github.com/angeloINTJ/BMx280PIO_RP2040/actions/workflows/build.yml)
+[![Lint](https://github.com/angeloINTJ/BMx280PIO_RP2040/actions/workflows/lint.yml/badge.svg)](https://github.com/angeloINTJ/BMx280PIO_RP2040/actions/workflows/lint.yml)
 [![PlatformIO](https://img.shields.io/badge/PlatformIO-compatible-orange.svg)](https://platformio.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
@@ -63,6 +67,28 @@ void setup() {
 BMx280PIO_RP2040 sensor(2, 3);
 sensor.forceGPIO(true);   // Skip PIO+DMA, use GPIO bit-bang only
 sensor.begin();
+```
+
+### Debug Output
+
+```cpp
+BMx280PIO_RP2040 sensor(2, 3);
+sensor.begin(&Serial);    // Enable diagnostic output on Serial
+// or: sensor.begin();    // Silent operation (default)
+```
+
+### Error Handling
+
+```cpp
+BMx280PIO_RP2040 sensor(2, 3);
+if (!sensor.begin(&Serial)) {
+    BMx280Error err = sensor.getLastError();
+    if (err == BMX280_ERR_CHIP_ID) {
+        // Wrong sensor or address
+    } else if (err == BMX280_ERR_NOT_FOUND) {
+        // Sensor not detected (check wiring)
+    }
+}
 ```
 
 ## Wiring
@@ -234,10 +260,25 @@ bool isForcedGPIO();             // Check if GPIO mode is active
 uint8_t getChipID();             // 0x58 = BMP280, 0x60 = BME280
 bool isBME280();                 // True if humidity sensor present
 bool isInitialized();            // True if sensor ready
+BMx280Error getLastError();      // Last error code (cleared on begin())
 uint8_t readRegister(uint8_t reg);
 void    writeRegister(uint8_t reg, uint8_t value);
 void    readRegisters(uint8_t reg, uint8_t *data, size_t len);
 ```
+
+### Error Codes
+
+| Code | Description |
+|------|-------------|
+| `BMX280_OK` | No error |
+| `BMX280_ERR_NOT_FOUND` | Sensor not detected at I2C address |
+| `BMX280_ERR_CHIP_ID` | Invalid or unknown chip ID |
+| `BMX280_ERR_CAL_FAIL` | Calibration data read failed |
+| `BMX280_ERR_I2C_WRITE` | I2C write (NACK) failure |
+| `BMX280_ERR_I2C_READ` | I2C read failure |
+| `BMX280_ERR_MEAS_TIMEOUT` | Measurement did not complete in time |
+| `BMX280_ERR_NOT_INIT` | Sensor not initialized |
+| `BMX280_ERR_CTRL_MEAS` | CTRL_MEAS register write failed after retries |
 
 ## Operating Modes
 
@@ -246,6 +287,36 @@ void    readRegisters(uint8_t reg, uint8_t *data, size_t len);
 | **Sleep** | 0.1 µA | Sensor idle, registers preserved |
 | **Forced** | 1.2 mA (peak) / ~3 µA avg | Single measurement, auto-return to sleep |
 | **Normal** | 1.2 mA (peak) / ~2.7 µA @ 1 Hz | Continuous measurement, configurable interval |
+
+## Troubleshooting
+
+### Sensor Not Detected
+
+- **Check wiring**: Verify SDA and SCL connections. Ensure VCC = 3.3V (not 5V).
+- **Pull-up resistors**: The BME280 requires external 10kΩ pull-ups on SDA and SCL to 3.3V. The RP2040 internal pull-ups (~50kΩ) may not be sufficient at higher speeds.
+- **Wrong address**: Try `0x77` instead of `0x76` (some breakout boards tie SDO to VCC).
+- **Cold-start delay**: After power-on, wait at least 2ms before calling `begin()`. The driver handles this internally.
+
+### Unstable Readings
+
+- **Increase oversampling**: `sensor.setTemperatureOversampling(BME280_OS_16X)` etc. Higher oversampling reduces noise.
+- **Enable IIR filter**: `sensor.setFilter(BME280_FILTER_16)` for maximum smoothing.
+- **Check power supply**: The BME280 draws ~1.2mA during measurement. A noisy or weak 3.3V supply causes unstable readings.
+- **Wait for settling**: In normal mode, the first 2-3 readings after configuration changes may be unstable.
+
+### PIO+DMA Not Working
+
+- **Try GPIO fallback**: `sensor.forceGPIO(true)` to use bit-bang instead of PIO+DMA.
+- **Check pin compatibility**: PIO+DMA works on any GPIO pin pair. If using GPIO 0/1, ensure `Serial1` (hardware UART0) is not active.
+- **Verify WirePIO version**: Requires `WirePIO >= 1.3.5`.
+
+### begin() Returns false
+
+- Use debug output to identify the failure point:
+  ```cpp
+  sensor.begin(&Serial);  // prints: "BMx280: bad chip ID 0x00" etc.
+  ```
+- Check `sensor.getLastError()` for the specific error code.
 
 ## Known Limitations
 
@@ -279,6 +350,8 @@ The timing is conservative (slower than max spec) for robust operation. The BME2
 
 ## Changelog
 
+See [CHANGELOG.md](CHANGELOG.md) for the full history.
+
 ### v1.3.0 (2026-07-14)
 
 - **PIO+DMA cold-start fix** — Prime SM with 5 dummy reads before `begin()` for reliable first-boot operation
@@ -287,6 +360,7 @@ The timing is conservative (slower than max spec) for robust operation. The BME2
 - **CTRL_MEAS NACK retry** — Retry up to 3 times on NACK with 500µs backoff for robust mode transitions
 - **Dual-core I2C logic analyzer** — Diagnostic example using Core 1 as ~5 MHz logic analyzer to debug PIO+DMA timing issues
 - **Comprehensive hardware test suite** — 5 sensors, 7 tests, 850+ readings, 0 failures across PIO+DMA, GPIO bit-bang, forced mode, hardware Wire, multi-sensor, benchmark, and 30s stability
+- **Code quality improvements** — Renamed GPIO helpers (`dly`→`i2c_delay`, etc.), proper formatting, error code enum, debug stream support, CI/CD workflows, governance files
 - **GPIO 0/1 + USB Serial coexistence** — Documented that GPIO 0/1 work for I2C simultaneously with USB CDC Serial (only `Serial1` hardware UART0 conflicts)
 
 ### v1.2.4 (2026-07-12)
@@ -294,9 +368,6 @@ The timing is conservative (slower than max spec) for robust operation. The BME2
 - Fix `maintainer` field as boolean in `library.json`
 - Fix dependency name in README (`TwoWirePIO_RP2040` → `WirePIO`)
 - Complete README rewrite: fix stale API docs, wrong defaults, missing methods
-- Fix documentation: add `@author` tags, Author section
-- Fix library metadata, add `forceGPIO()`, calibration fix, benchmark example
-- Documentation review: fix phantom APIs, stale references, missing constants
 
 ## License
 
