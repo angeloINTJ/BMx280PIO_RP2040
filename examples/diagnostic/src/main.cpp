@@ -1,6 +1,11 @@
 /**
- * WirePIO Transport Deep Diagnostic
- * Tests: GPIO switching, DMA reliability, read-back verification
+ * I2C Logic Analyzer — Dual-Core RP2040
+ *
+ * Core 1: fast GPIO sampling of SDA+SCL into a ring buffer
+ * Core 0: runs PIO+DMA I2C transactions, then dumps captured waveform
+ *
+ * Compile with: pio run -d .../diagnostic
+ * Requires: Pico with BMP280 on GPIO4(SDA)/GPIO5(SCL)
  */
 #include <Arduino.h>
 #include "BMx280PIO_RP2040.h"
@@ -9,108 +14,208 @@
 #define SCL 5
 #define ADDR 0x76
 
+// ─── Logic Analyzer on Core 1 ─────────────────────────────────────────
+#define CAP_BITS 16000  // capture this many samples
+volatile uint32_t g_cap[CAP_BITS];  // each word stores SDA(bit0)+SCL(bit1)
+volatile uint32_t g_cap_idx = 0;
+volatile bool g_cap_done = false;
+volatile bool g_cap_arm = false;
+
+void setup1() {}
+void loop1() {
+    if (!g_cap_arm) { delay(1); return; }
+
+    // Fast capture loop: sample both pins, store in buffer
+    uint32_t mask = (1u << SDA) | (1u << SCL);
+    uint32_t *buf = (uint32_t *)g_cap;
+    uint32_t sio_base = SIO_BASE;
+
+    for (int i = 0; i < CAP_BITS; i++) {
+        // Read GPIO IN register directly (fastest possible read)
+        buf[i] = (*(volatile uint32_t *)(sio_base + 0x004)) & mask;
+    }
+    g_cap_done = true;
+    g_cap_arm = false;
+}
+
+// ─── Trigger capture from Core 0 ───────────────────────────────────────
+static void capStart() {
+    g_cap_idx = 0;
+    g_cap_done = false;
+    g_cap_arm = true;
+    delayMicroseconds(50); // let Core 1 start capturing before transaction
+}
+
+static void capWait() {
+    while (!g_cap_done) { /* wait */ }
+    delayMicroseconds(10); // let last samples flush
+}
+
+// ─── Analyze and print captured waveform ───────────────────────────────
+static void capAnalyze(const char *label) {
+    uint32_t mask = (1u << SDA) | (1u << SCL);
+    uint32_t *buf = (uint32_t *)g_cap;
+
+    // Find first SCL HIGH → LOW transition (start of I2C activity)
+    int start = 0;
+    for (int i = 1; i < CAP_BITS - 1; i++) {
+        // SCL was HIGH, now LOW
+        if ((buf[i-1] & (1u << SCL)) && !(buf[i] & (1u << SCL))) {
+            start = i;
+            break;
+        }
+    }
+
+    Serial.print("\n--- "); Serial.print(label); Serial.println(" ---");
+    Serial.print("  First SCL edge at sample: "); Serial.println(start);
+
+    // Measure SCL period (HIGH pulse width + LOW pulse width)
+    int sclHighTotal = 0, sclLowTotal = 0;
+    int sclHighCount = 0, sclLowCount = 0;
+    int sclHighMin = 99999, sclHighMax = 0;
+    int sclLowMin = 99999, sclLowMax = 0;
+
+    int state = 0; // 0=waiting, 1=SCL_HIGH, 2=SCL_LOW
+    int count = 0;
+    int transitions = 0;
+
+    for (int i = start; i < CAP_BITS - 1 && transitions < 500; i++) {
+        bool scl_high = buf[i] & (1u << SCL);
+        bool scl_prev = buf[i-1] & (1u << SCL);
+
+        if (scl_high != scl_prev) {
+            transitions++;
+            if (scl_high) {
+                // LOW → HIGH: measure previous LOW duration
+                if (count > 0 && count < 5000 && sclLowCount > 3) {
+                    sclLowTotal += count;
+                    sclLowCount++;
+                    if (count < sclLowMin) sclLowMin = count;
+                    if (count > sclLowMax) sclLowMax = count;
+                }
+            } else {
+                // HIGH → LOW: measure previous HIGH duration
+                if (count > 0 && count < 5000 && sclHighCount > 3) {
+                    sclHighTotal += count;
+                    sclHighCount++;
+                    if (count < sclHighMin) sclHighMin = count;
+                    if (count > sclHighMax) sclHighMax = count;
+                }
+            }
+            count = 0;
+        }
+        count++;
+    }
+
+    if (sclHighCount > 0 && sclLowCount > 0) {
+        float avgHigh = (float)sclHighTotal / sclHighCount;
+        float avgLow = (float)sclLowTotal / sclLowCount;
+        float period = avgHigh + avgLow;
+        float freq_khz = 133000.0f / period;  // 133 MHz CPU clock
+
+        Serial.print("  SCL HIGH: avg="); Serial.print(avgHigh, 1);
+        Serial.print(" samples (min="); Serial.print(sclHighMin);
+        Serial.print(" max="); Serial.print(sclHighMax);
+        Serial.print(") = "); Serial.print(avgHigh / 133.0f, 1); Serial.println(" µs");
+
+        Serial.print("  SCL LOW:  avg="); Serial.print(avgLow, 1);
+        Serial.print(" samples (min="); Serial.print(sclLowMin);
+        Serial.print(" max="); Serial.print(sclLowMax);
+        Serial.print(") = "); Serial.print(avgLow / 133.0f, 1); Serial.println(" µs");
+
+        Serial.print("  SCL period: "); Serial.print(period, 1);
+        Serial.print(" samples = "); Serial.print(period / 133.0f, 2);
+        Serial.print(" µs → I2C freq = "); Serial.print(freq_khz, 1);
+        Serial.println(" kHz");
+        Serial.print("  Samples: HIGH="); Serial.print(sclHighCount);
+        Serial.print(" LOW="); Serial.println(sclLowCount);
+    }
+
+    // Print first 50 samples around first edge for visual inspection
+    Serial.print("  Waveform (first 100 samples from edge): ");
+    for (int i = start; i < start + 100 && i < CAP_BITS; i++) {
+        bool sda = buf[i] & (1u << SDA);
+        bool scl = buf[i] & (1u << SCL);
+        Serial.print(sda ? "H" : "L");
+        Serial.print(scl ? "H" : "L");
+        Serial.print(" ");
+        if ((i - start) % 20 == 19) Serial.println();
+    }
+    Serial.println();
+}
+
+// ─── Core 0 ────────────────────────────────────────────────────────────
 void setup() {
     Serial.begin(115200);
     while (!Serial) delay(10);
     delay(2000);
 
-    Serial.println("\n=== WirePIO Transport Diagnostic ===\n");
+    Serial.println("\n=== I2C Logic Analyzer — Dual-Core ===\n");
+    Serial.print("Sampling rate: ~133 MHz / ~6 cycles = ~22 Msps\n");
+    Serial.print("Capture depth: "); Serial.print(CAP_BITS); Serial.println(" samples\n");
 
-    BMx280PIO_RP2040 s(SDA, SCL, ADDR, 200000, pio0);
-    if (!s.begin()) { Serial.println("begin FAIL!"); return; }
-    Serial.print("Chip: "); Serial.println(s.isBME280()?"BME280":"BMP280");
-
-    // Test 1: read chip ID 50x via PIO+DMA, check consistency
-    Serial.println("\n--- Test 1: Chip ID consistency (50 reads) ---");
-    uint8_t first = 0;
-    int mismatches = 0;
-    for (int i = 0; i < 50; i++) {
-        uint8_t cid = s.readRegister(0xD0);
-        if (i == 0) first = cid;
-        if (cid != first) {
-            mismatches++;
-            Serial.print("  MISMATCH at "); Serial.print(i);
-            Serial.print(": 0x"); Serial.print(cid, HEX);
-            Serial.print(" != 0x"); Serial.println(first, HEX);
-        }
-        delayMicroseconds(500);
-    }
-    Serial.print("  First: 0x"); Serial.print(first, HEX);
-    Serial.print("  Mismatches: "); Serial.println(mismatches);
-
-    // Test 2: read calibration 10x, compare
-    Serial.println("\n--- Test 2: Calibration consistency (10 reads) ---");
-    uint8_t cal0[6], cal[6];
-    s.readRegisters(0x88, cal0, 6);
-    int calMismatches = 0;
-    for (int r = 1; r < 10; r++) {
-        s.readRegisters(0x88, cal, 6);
-        for (int i = 0; i < 6; i++) {
-            if (cal[i] != cal0[i]) {
-                calMismatches++;
-                Serial.print("  CAL["); Serial.print(i);
-                Serial.print("] mismatch at read "); Serial.print(r);
-                Serial.print(": 0x"); Serial.print(cal[i], HEX);
-                Serial.print(" != 0x"); Serial.println(cal0[i], HEX);
-            }
-        }
-        delayMicroseconds(500);
-    }
-    Serial.print("  Calibration mismatches: "); Serial.println(calMismatches);
-
-    // Test 3: setMode + verify CTRL_MEAS register
-    Serial.println("\n--- Test 3: setMode verification ---");
-    uint8_t ctrl_before = s.readRegister(0xF4);
-    Serial.print("  CTRL_MEAS before setMode(NORMAL): 0x");
-    Serial.println(ctrl_before, HEX);
-
-    s.setMode(BME280_MODE_NORMAL);
-    delay(50);
-
-    uint8_t ctrl_after = s.readRegister(0xF4);
-    Serial.print("  CTRL_MEAS after setMode(NORMAL):  0x");
-    Serial.println(ctrl_after, HEX);
-
-    // Verify: should have osrs_t=1 (bits 7:5 = 001), osrs_p=1 (bits 4:2 = 001), mode=NORMAL (bits 1:0 = 11)
-    // Expected: 0b00100111 = 0x27
-    uint8_t expected = 0x27;
-    bool ctrl_ok = (ctrl_after == expected);
-    Serial.print("  Expected: 0x27  "); Serial.println(ctrl_ok ? "OK" : "FAIL!");
-
-    // Test 4: Sensor data 5x after NORMAL mode
-    Serial.println("\n--- Test 4: Sensor readings in NORMAL mode ---");
-    s.setMode(BME280_MODE_NORMAL);
-    delay(200); // wait for first measurement
-    for (int i = 0; i < 5; i++) {
-        float t = s.readTemperature();
-        float p = s.readPressure();
-        uint8_t d[8];
-        s.readRegisters(0xF7, d, 8);
-        Serial.print("  ["); Serial.print(i); Serial.print("] raw=[");
-        for (int j=0;j<8;j++){Serial.print(d[j],HEX);Serial.print(" ");}
-        Serial.print("] T="); Serial.print(t,1);
-        Serial.print("C P="); Serial.print(p,0);
-        Serial.println("hPa");
-        delay(250);
-    }
-
-    // Test 5: Compare with force GPIO on same sensor
-    Serial.println("\n--- Test 5: GPIO bit-bang comparison (same sensor) ---");
+    // ─── Test 1: GPIO bit-bang I2C (known good) ────────────────────
+    Serial.println("--- Test 1: GPIO bit-bang (reference) ---");
     {
-        BMx280PIO_RP2040 s2(SDA, SCL, ADDR);
-        s2.forceGPIO(true);
-        s2.begin();
-        s2.setMode(BME280_MODE_NORMAL);
+        BMx280PIO_RP2040 s(SDA, SCL, ADDR);
+        s.forceGPIO(true);
+        if (!s.begin()) { Serial.println("GPIO begin FAIL!"); return; }
+        s.setMode(BME280_MODE_NORMAL);
         delay(200);
+
+        capStart();
         float t, p;
-        s2.readAll(&t, &p, nullptr);
-        uint8_t d[8];
-        s2.readRegisters(0xF7, d, 8);
-        Serial.print("  GPIO: raw=[");
-        for (int j=0;j<8;j++){Serial.print(d[j],HEX);Serial.print(" ");}
-        Serial.print("] T="); Serial.print(t,1);
-        Serial.print("C P="); Serial.print(p,0);
-        Serial.println("hPa");
+        s.readAll(&t, &p, nullptr);
+        capWait();
+
+        capAnalyze("GPIO bit-bang readAll");
+        Serial.print("  Result: T="); Serial.print(t,1);
+        Serial.print("C P="); Serial.print(p,0); Serial.println("hPa");
+    }
+    delay(500);
+
+    // ─── Test 2: Capture PIO+DMA begin (includes CTRL_MEAS write) ─
+    Serial.println("\n--- Test 2: PIO+DMA begin() capture ---");
+    {
+        capStart();  // arm BEFORE creating sensor (captures begin writes)
+        BMx280PIO_RP2040 s(SDA, SCL, ADDR, 200000, pio0);
+        bool ok = s.begin();
+        capWait();
+
+        Serial.print("  begin: "); Serial.println(ok ? "OK" : "FAIL");
+        if (ok) {
+            Serial.print("  CTRL_MEAS: 0x"); Serial.println(s.readRegister(0xF4), HEX);
+            capAnalyze("PIO+DMA begin() transaction");
+
+            s.setMode(BME280_MODE_NORMAL);
+            delay(200);
+            capStart();
+            float t, p;
+            s.readAll(&t, &p, nullptr);
+            capWait();
+            capAnalyze("PIO+DMA readAll");
+            Serial.print("  Result: T="); Serial.print(t,1);
+            Serial.print("C P="); Serial.print(p,0); Serial.println("hPa");
+        }
+    }
+    delay(500);
+
+    // ─── Test 3: PIO+DMA setMode write ────────────────────────────
+    Serial.println("\n--- Test 3: PIO+DMA setMode write ---");
+    {
+        BMx280PIO_RP2040 s(SDA, SCL, ADDR, 200000, pio0);
+        if (!s.begin()) { Serial.println("PIO begin FAIL!"); return; }
+        Serial.print("  CTRL_MEAS before: 0x"); Serial.println(s.readRegister(0xF4), HEX);
+
+        capStart();
+        s.setMode(BME280_MODE_NORMAL);
+        capWait();
+
+        capAnalyze("PIO+DMA setMode write");
+        uint8_t ctrl = s.readRegister(0xF4);
+        Serial.print("  CTRL_MEAS after: 0x"); Serial.print(ctrl, HEX);
+        Serial.print(" (expected 0x27) ");
+        Serial.println(ctrl == 0x27 ? "OK" : "FAIL!");
     }
 
     Serial.println("\n=== Done ===");
