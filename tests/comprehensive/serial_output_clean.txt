@@ -1,0 +1,219 @@
+╔══════════════════════════════════════════════════════════════╗
+║  BMx280PIO_RP2040 — COMPREHENSIVE HARDWARE TEST SUITE       ║
+║  5x BMP280/BME280 | All Modes | Automated Pass              ║
+╠══════════════════════════════════════════════════════════════╣
+║  Test Plan:                                                 ║
+║    1. PIO+DMA Basic Reading   (Normal mode, 10 reads each)  ║
+║    2. Forced Mode             (Single-shot, 5 reads each)   ║
+║    3. GPIO Bit-Bang           (Software I2C, 5 reads each)  ║
+║    4. Hardware Wire           (Adafruit BMP280, 2 sensors)  ║
+║    5. Multi-Sensor            (2 sensors simultaneous)      ║
+║    6. Mini-Benchmark          (100 reads, stats)            ║
+╠══════════════════════════════════════════════════════════════╣
+║  Sensors: S0 (0/1), S1 (2/3), S2 (4/5), S3 (6/7), S4 (8/9)       ║
+╚══════════════════════════════════════════════════════════════╝
+╔══════════════════════════════════════════════════════════════╗
+║  SECTION 1: PIO+DMA Basic Reading (Normal Mode)              ║
+╚══════════════════════════════════════════════════════════════╝
+── Initializing sensors (PIO+DMA, 200 kHz) ──
+  S0 (0/1) ... BMP280  ChipID=0x58  (pio0)
+  S1 (2/3) ... BMP280  ChipID=0x58  (pio0)
+  S2 (4/5) ... BMP280  ChipID=0x58  (pio0)
+  S3 (6/7) ... BMP280  ChipID=0x58  (pio1)
+  S4 (8/9) ... BMP280  ChipID=0x58  (pio1)
+  Sensors found: 5/5
+── Configuring: 2× Temp, 4× Press, Filter 4× ──
+── 10 readings per sensor (PIO+DMA burstRead @ 200 kHz) ──
+  [1/10]  S0 (0/1): 18.2C/1019hPa S1 (2/3): 17.9C/1019hPa S2 (4/5): 17.9C/1019hPa S3 (6/7): 17.8C/1018hPa S4 (8/9): 17.7C/1019hPa 
+  [2/10]  S0 (0/1): 18.2C/1019hPa S1 (2/3): 17.9C/1019hPa S2 (4/5): 17.9C/1019hPa S3 (6/7): 17.8C/1018hPa S4 (8/9): 17.7C/1019hPa 
+  [3/10]  S0 (0/1): 18.2C/1019hPa S1 (2/3): 17.9C/1019hPa S2 (4/5): 17.9C/1019hPa S3 (6/7): 17.8C/1018hPa S4 (8/9): 17.7C/1019hPa 
+  [4/10]  S0 (0/1): 18.2C/1019hPa S1 (2/3): 17.9C/1019hPa S2 (4/5): 17.9C/1019hPa S3 (6/7): 17.8C/1018hPa S4 (8/9): 17.7C/1019hPa 
+  [5/10]  S0 (0/1): 18.2C/1019hPa S1 (2/3): 17.9C/1019hPa S2 (4/5): 17.9C/1019hPa S3 (6/7): 17.8C/1018hPa S4 (8/9): 17.7C/1019hPa 
+  [6/10]  S0 (0/1): 18.2C/1019hPa S1 (2/3): 17.9C/1019hPa S2 (4/5): 17.9C/1019hPa S3 (6/7): 17.8C/1018hPa S4 (8/9): 17.7C/1019hPa 
+  [7/10]  S0 (0/1): 18.2C/1019hPa S1 (2/3): 17.9C/1019hPa S2 (4/5): 17.9C/1019hPa S3 (6/7): 17.8C/1018hPa S4 (8/9): 17.7C/1019hPa 
+  [8/10]  S0 (0/1): 18.2C/1019hPa S1 (2/3): 17.9C/1019hPa S2 (4/5): 17.9C/1019hPa S3 (6/7): 17.8C/1018hPa S4 (8/9): 17.7C/1019hPa 
+  [9/10]  S0 (0/1): 18.2C/1019hPa S1 (2/3): 17.9C/1019hPa S2 (4/5): 17.9C/1019hPa S3 (6/7): 17.8C/1018hPa S4 (8/9): 17.7C/1019hPa 
+  [10/10]  S0 (0/1): 18.2C/1019hPa S1 (2/3): 17.9C/1019hPa S2 (4/5): 17.9C/1019hPa S3 (6/7): 17.8C/1018hPa S4 (8/9): 17.7C/1019hPa 
+── PIO+DMA Basic Reading Results ────────────────────────────
+  Sensor     T_avg    T_min    T_max    P_avg     P_min     P_max    Time/read
+  ──────     ─────    ─────    ─────    ─────     ─────     ─────    ─────────
+  S0 (0/1)  18.18  18.16  18.21  1018.8  1018.7  1018.8  655 µs
+  S1 (2/3)  17.92  17.91  17.92  1018.9  1018.9  1019.0  643 µs
+  S2 (4/5)  17.88  17.87  17.88  1018.7  1018.7  1018.8  642 µs
+  S3 (6/7)  17.77  17.76  17.77  1018.4  1018.4  1018.5  643 µs
+  S4 (8/9)  17.68  17.67  17.69  1018.6  1018.5  1018.7  640 µs
+── Approximate Altitude (std atmosphere) ──
+  S0 (0/1): -45.7 m
+  S1 (2/3): -47.1 m
+  S2 (4/5): -45.4 m
+  S3 (6/7): -42.9 m
+  S4 (8/9): -44.2 m
+╔══════════════════════════════════════════════════════════════╗
+║  SECTION 2: Forced Mode (Single-Shot, Low Power)             ║
+╚══════════════════════════════════════════════════════════════╝
+── Initializing sensors (PIO+DMA) ──
+  S0 (0/1) ... BMP280 OK (1× os, no filter, low-power config)
+  S1 (2/3) ... BMP280 OK (1× os, no filter, low-power config)
+  S2 (4/5) ... BMP280 OK (1× os, no filter, low-power config)
+  S3 (6/7) ... BMP280 OK (1× os, no filter, low-power config)
+  S4 (8/9) ... BMP280 OK (1× os, no filter, low-power config)
+── 5 forced measurements per sensor ──
+  [1/5]  S0 (0/1): 18.2C/1019hPa (8.3ms) S1 (2/3): 17.9C/1019hPa (9.5ms) S2 (4/5): 17.9C/1019hPa (8.3ms) S3 (6/7): 17.8C/1018hPa (8.3ms) S4 (8/9): 17.7C/1019hPa (8.3ms) 
+  [2/5]  S0 (0/1): 18.2C/1019hPa (8.3ms) S1 (2/3): 17.9C/1019hPa (8.3ms) S2 (4/5): 17.9C/1019hPa (8.3ms) S3 (6/7): 17.8C/1018hPa (8.3ms) S4 (8/9): 17.7C/1019hPa (8.3ms) 
+  [3/5]  S0 (0/1): 18.2C/1019hPa (8.3ms) S1 (2/3): 17.9C/1019hPa (8.3ms) S2 (4/5): 17.9C/1019hPa (8.3ms) S3 (6/7): 17.8C/1018hPa (8.3ms) S4 (8/9): 17.7C/1019hPa (8.3ms) 
+  [4/5]  S0 (0/1): 18.2C/1019hPa (8.3ms) S1 (2/3): 17.9C/1019hPa (8.3ms) S2 (4/5): 17.9C/1019hPa (8.3ms) S3 (6/7): 17.8C/1018hPa (8.3ms) S4 (8/9): 17.7C/1019hPa (8.3ms) 
+  [5/5]  S0 (0/1): 18.2C/1019hPa (8.3ms) S1 (2/3): 17.9C/1019hPa (8.3ms) S2 (4/5): 17.9C/1019hPa (8.3ms) S3 (6/7): 17.8C/1018hPa (8.3ms) S4 (8/9): 17.7C/1019hPa (8.3ms) 
+── Forced Mode Summary ───────────────────────────────────────
+  Forced mode = sensor wakes, measures, returns to sleep.
+  Ideal for battery-powered applications. ~3 µA average current.
+╔══════════════════════════════════════════════════════════════╗
+║  SECTION 3: GPIO Bit-Bang Mode (Software I2C @ 100 kHz)      ║
+╚══════════════════════════════════════════════════════════════╝
+── Initializing sensors with forceGPIO(true) ──
+  S0 (0/1) ... BMP280 OK (GPIO bit-bang, 100 kHz)
+  S1 (2/3) ... BMP280 OK (GPIO bit-bang, 100 kHz)
+  S2 (4/5) ... BMP280 OK (GPIO bit-bang, 100 kHz)
+  S3 (6/7) ... BMP280 OK (GPIO bit-bang, 100 kHz)
+  S4 (8/9) ... BMP280 OK (GPIO bit-bang, 100 kHz)
+── 5 readings per sensor (GPIO bit-bang) ──
+  [1/5]  S0 (0/1): 18.2C/1019hPa (3601µs) S1 (2/3): 17.9C/1019hPa (3555µs) S2 (4/5): 17.9C/1019hPa (3561µs) S3 (6/7): 17.8C/1018hPa (3540µs) S4 (8/9): 17.7C/1019hPa (3538µs) 
+  [2/5]  S0 (0/1): 18.2C/1019hPa (3567µs) S1 (2/3): 17.9C/1019hPa (3539µs) S2 (4/5): 17.9C/1019hPa (3560µs) S3 (6/7): 17.8C/1018hPa (3556µs) S4 (8/9): 17.7C/1019hPa (3552µs) 
+  [3/5]  S0 (0/1): 18.2C/1019hPa (3556µs) S1 (2/3): 17.9C/1019hPa (3552µs) S2 (4/5): 17.9C/1019hPa (3564µs) S3 (6/7): 17.8C/1018hPa (3567µs) S4 (8/9): 17.7C/1019hPa (3546µs) 
+  [4/5]  S0 (0/1): 18.2C/1019hPa (3548µs) S1 (2/3): 17.9C/1019hPa (3552µs) S2 (4/5): 17.9C/1019hPa (3549µs) S3 (6/7): 17.8C/1018hPa (3553µs) S4 (8/9): 17.7C/1019hPa (3548µs) 
+  [5/5]  S0 (0/1): 18.2C/1019hPa (3539µs) S1 (2/3): 17.9C/1019hPa (3561µs) S2 (4/5): 17.9C/1019hPa (3559µs) S3 (6/7): 17.8C/1018hPa (3552µs) S4 (8/9): 17.7C/1019hPa (3530µs) 
+── GPIO Bit-Bang Timing (avg µs/read) ──
+  Sensor     GPIO avg    Expected     Verdict
+  ──────     ────────    ────────     ──────
+  S0 (0/1)      3562 µs     ~3500 µs     PASS
+  S1 (2/3)      3552 µs     ~3500 µs     PASS
+  S2 (4/5)      3559 µs     ~3500 µs     PASS
+  S3 (6/7)      3554 µs     ~3500 µs     PASS
+  S4 (8/9)      3543 µs     ~3500 µs     PASS
+╔══════════════════════════════════════════════════════════════╗
+║  SECTION 4: Hardware Wire Mode (Adafruit BMP280 @ 100 kHz)   ║
+╚══════════════════════════════════════════════════════════════╝
+── Using Adafruit BMP280 Library via hardware I2C ──
+  S2 (GPIO 4/5) Wire I2C0 ... BMP280 OK
+  S3 (GPIO 6/7) Wire1 I2C1 ... BMP280 OK
+── 5 readings per sensor (Adafruit Wire) ──
+  [1/5]  S2: 18.0C/1019hPa (1938µs)  S3: 17.9C/1018hPa (1870µs)
+  [2/5]  S2: 18.1C/1019hPa (1874µs)  S3: 18.0C/1018hPa (1861µs)
+  [3/5]  S2: 18.2C/1019hPa (1872µs)  S3: 18.0C/1018hPa (1860µs)
+  [4/5]  S2: 18.2C/1019hPa (1870µs)  S3: 18.0C/1018hPa (1861µs)
+  [5/5]  S2: 18.2C/1019hPa (1873µs)  S3: 18.0C/1018hPa (1890µs)
+── Hardware Wire vs PIO+DMA (from Section 1) ──
+  Adafruit Wire @ 100 kHz: ~1800 µs/read (reference)
+  PIO+DMA @ 200 kHz:      ~550 µs/read  (3.3× faster)
+  GPIO bit-bang @ 100 kHz: ~3500 µs/read (reliable fallback)
+╔══════════════════════════════════════════════════════════════╗
+║  SECTION 5: Multi-Sensor Simultaneous Read                   ║
+╚══════════════════════════════════════════════════════════════╝
+── Initializing 2 sensors on independent PIO+DMA buses ──
+  S2 (GPIO 4/5) pio0 ... BMP280 OK
+  S3 (GPIO 6/7) pio1 ... BMP280 OK
+── 10 simultaneous readings with cross-sensor delta ──
+  [1/10]  A: 18.17C/1018.7hPa  B: 18.04C/1018.4hPa  ΔT=0.13 ΔP=0.3  (1341 µs total)
+  [2/10]  A: 17.94C/1018.7hPa  B: 17.83C/1018.4hPa  ΔT=0.11 ΔP=0.3  (1270 µs total)
+  [3/10]  A: 17.91C/1018.7hPa  B: 17.79C/1018.4hPa  ΔT=0.12 ΔP=0.3  (1271 µs total)
+  [4/10]  A: 17.89C/1018.7hPa  B: 17.78C/1018.4hPa  ΔT=0.11 ΔP=0.3  (1265 µs total)
+  [5/10]  A: 17.88C/1018.7hPa  B: 17.79C/1018.4hPa  ΔT=0.09 ΔP=0.3  (1263 µs total)
+  [6/10]  A: 17.88C/1018.7hPa  B: 17.78C/1018.4hPa  ΔT=0.10 ΔP=0.3  (1256 µs total)
+  [7/10]  A: 17.88C/1018.7hPa  B: 17.77C/1018.5hPa  ΔT=0.11 ΔP=0.2  (1265 µs total)
+  [8/10]  A: 17.88C/1018.7hPa  B: 17.77C/1018.4hPa  ΔT=0.11 ΔP=0.2  (1253 µs total)
+  [9/10]  A: 17.88C/1018.7hPa  B: 17.77C/1018.4hPa  ΔT=0.11 ΔP=0.2  (1263 µs total)
+  [10/10]  A: 17.88C/1018.7hPa  B: 17.77C/1018.4hPa  ΔT=0.11 ΔP=0.3  (1274 µs total)
+── Multi-Sensor Summary ─────────────────────────────────────
+  Avg absolute ΔT: 0.110 °C
+  Avg absolute ΔP: 0.27 hPa
+  Note: Small deltas = good sensor agreement. Large deltas
+        may indicate different drafts/sunlight per sensor.
+╔══════════════════════════════════════════════════════════════╗
+║  SECTION 6: Mini-Benchmark (PIO+DMA vs GPIO vs Wire)         ║
+╚══════════════════════════════════════════════════════════════╝
+── Benchmark: 
+     Sensor: S2 (GPIO 4/5), 100 readings per mode
+     Modes: PIO+DMA @ 200kHz | GPIO bit-bang @ 100kHz | Wire @ 100kHz
+── Mode 1: PIO+DMA @ 200 kHz ──────────────────────────────────────────
+  Sensor: BMP280
+  Running 100 reads...
+  Min: 623 µs | Med: 630 µs | Mean: 631.1 µs
+  P99: 645 µs | Max: 645 µs | SD: 4.1 µs
+  Throughput: 1584.6 reads/s | T_avg: 17.88°C | P_avg: 1018.7 hPa
+── Mode 2: GPIO Bit-Bang @ 100 kHz ──────────────────────────────────────────
+  Running 100 reads...
+  Min: 3513 µs | Med: 3519 µs | Mean: 3520.3 µs
+  P99: 3557 µs | Max: 3557 µs | SD: 5.1 µs
+  Throughput: 284.1 reads/s
+── Mode 3: Adafruit BMP280 (hardware Wire @ 100 kHz) ──────────────────────────────────────────
+  Running 100 reads...
+  Min: 1846 µs | Med: 1850 µs | Mean: 1851.9 µs
+  P99: 1875 µs | Max: 1875 µs | SD: 5.5 µs
+  Throughput: 540.0 reads/s
+╔══════════════════════════════════════════════════════════════╗
+║  SECTION 7: Stability Quick-Check (30s loop all sensors)     ║
+╚══════════════════════════════════════════════════════════════╝
+── Initializing all 5 sensors (PIO+DMA) ──
+  S0 (0/1) ... BMP280 OK
+  S1 (2/3) ... BMP280 OK
+  S2 (4/5) ... BMP280 OK
+  S3 (6/7) ... BMP280 OK
+  S4 (8/9) ... BMP280 OK
+── Reading all sensors continuously for ~30 seconds ──
+  [1] 18.2C/1019hPa 17.9C/1019hPa 18.0C/1019hPa 17.8C/1018hPa 17.7C/1019hPa 
+  [2] 18.2C/1019hPa 17.9C/1019hPa 17.9C/1019hPa 17.8C/1018hPa 17.7C/1019hPa 
+  [3] 18.2C/1019hPa 17.9C/1019hPa 17.9C/1019hPa 17.8C/1018hPa 17.7C/1019hPa 
+  [4] 18.2C/1019hPa 17.9C/1019hPa 17.9C/1019hPa 17.8C/1018hPa 17.7C/1019hPa 
+  [5] 18.1C/1019hPa 17.9C/1019hPa 17.9C/1019hPa 17.8C/1018hPa 17.7C/1019hPa 
+  [6] 18.1C/1019hPa 17.9C/1019hPa 17.9C/1019hPa 17.8C/1018hPa 17.7C/1019hPa 
+  [7] 18.2C/1019hPa 17.9C/1019hPa 17.9C/1019hPa 17.8C/1018hPa 17.7C/1019hPa 
+  [8] 18.1C/1019hPa 17.9C/1019hPa 17.9C/1019hPa 17.8C/1018hPa 17.7C/1019hPa 
+  [9] 18.1C/1019hPa 17.9C/1019hPa 17.9C/1019hPa 17.8C/1018hPa 17.7C/1019hPa 
+  [10] 18.2C/1019hPa 17.9C/1019hPa 17.9C/1019hPa 17.8C/1018hPa 17.7C/1019hPa 
+  [11] 18.1C/1019hPa 17.9C/1019hPa 17.9C/1019hPa 17.8C/1018hPa 17.7C/1019hPa 
+  [12] 18.2C/1019hPa 17.9C/1019hPa 17.9C/1019hPa 17.8C/1018hPa 17.7C/1019hPa 
+  [13] 18.2C/1019hPa 17.9C/1019hPa 17.9C/1019hPa 17.8C/1018hPa 17.7C/1019hPa 
+  [14] 18.2C/1019hPa 17.9C/1019hPa 17.9C/1019hPa 17.8C/1018hPa 17.7C/1019hPa 
+  [15] 18.1C/1019hPa 17.9C/1019hPa 17.9C/1019hPa 17.8C/1018hPa 17.7C/1019hPa 
+  [16] 18.2C/1019hPa 17.9C/1019hPa 17.9C/1019hPa 17.8C/1018hPa 17.7C/1018hPa 
+  [17] 18.1C/1019hPa 17.9C/1019hPa 17.9C/1019hPa 17.8C/1018hPa 17.7C/1019hPa 
+  [18] 18.2C/1019hPa 17.9C/1019hPa 17.9C/1019hPa 17.8C/1018hPa 17.7C/1019hPa 
+  [19] 18.1C/1019hPa 17.9C/1019hPa 17.9C/1019hPa 17.8C/1018hPa 17.7C/1019hPa 
+  [20] 18.1C/1019hPa 17.9C/1019hPa 17.9C/1019hPa 17.8C/1018hPa 17.7C/1019hPa 
+  [21] 18.2C/1019hPa 17.9C/1019hPa 17.9C/1019hPa 17.8C/1018hPa 17.7C/1019hPa 
+  [22] 18.2C/1019hPa 17.9C/1019hPa 17.9C/1019hPa 17.8C/1018hPa 17.7C/1019hPa 
+  [23] 18.1C/1019hPa 17.9C/1019hPa 17.9C/1019hPa 17.8C/1018hPa 17.7C/1019hPa 
+  [24] 18.2C/1019hPa 17.9C/1019hPa 17.9C/1019hPa 17.8C/1018hPa 17.7C/1019hPa 
+  [25] 18.2C/1019hPa 17.9C/1019hPa 17.9C/1019hPa 17.8C/1018hPa 17.7C/1019hPa 
+  [26] 18.2C/1019hPa 17.9C/1019hPa 17.9C/1019hPa 17.8C/1018hPa 17.7C/1019hPa 
+  [27] 18.2C/1019hPa 17.9C/1019hPa 17.9C/1019hPa 17.8C/1018hPa 17.7C/1019hPa 
+  [28] 18.2C/1019hPa 17.9C/1019hPa 17.9C/1019hPa 17.8C/1018hPa 17.7C/1019hPa 
+  [29] 18.2C/1019hPa 17.9C/1019hPa 17.9C/1019hPa 17.8C/1018hPa 17.7C/1019hPa 
+  [30] 18.2C/1019hPa 17.9C/1019hPa 17.9C/1019hPa 17.8C/1018hPa 17.7C/1019hPa 
+── Stability Test Results ───────────────────────────────────
+  Duration: 30.1 seconds
+  Sensor    ReadsOK  Fails  Success%    T_range       P_range
+  ──────    ───────  ─────  ────────    ───────       ───────
+  S0 (0/1)        30      0   100.0%       18.1..18.2 C  1019..1019 hPa
+  S1 (2/3)        30      0   100.0%       17.9..17.9 C  1019..1019 hPa
+  S2 (4/5)        30      0   100.0%       17.9..18.0 C  1019..1019 hPa
+  S3 (6/7)        30      0   100.0%       17.8..17.8 C  1018..1018 hPa
+  S4 (8/9)        30      0   100.0%       17.7..17.7 C  1018..1019 hPa
+╔══════════════════════════════════════════════════════════════╗
+║  TEST SUITE COMPLETE                                         ║
+╚══════════════════════════════════════════════════════════════╝
+  Sections executed:
+    1. PIO+DMA Basic Reading   — Normal mode, 10 reads × 5 sensors
+    2. Forced Mode              — Single-shot, 5 reads × 5 sensors
+    3. GPIO Bit-Bang            — Software I2C, 5 reads × 5 sensors
+    4. Hardware Wire (Adafruit) — I2C0+I2C1, 5 reads × 2 sensors
+    5. Multi-Sensor             — 2 simultaneous buses, 10 reads
+    6. Mini-Benchmark           — 100 reads PIO vs GPIO vs Wire
+    7. Stability Quick-Check    — 30s continuous loop all sensors
+  Library: BMx280PIO_RP2040 v1.2.4
+  Transport: WirePIO (PIO+DMA) + GPIO bit-bang fallback
+  Platform: Raspberry Pi Pico (RP2040) / earlephilhower core
+  ✅ All tests completed.
+  See tests/README.md for analysis and documentation.
+╔══════════════════════════════════════════════════════════════╗
+║  END OF COMPREHENSIVE HARDWARE TEST SUITE                   ║
+╚══════════════════════════════════════════════════════════════╝
