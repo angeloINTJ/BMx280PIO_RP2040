@@ -277,6 +277,27 @@ The timing is conservative (slower than max spec) for robust operation. The BME2
 - **[WirePIO](https://github.com/angeloINTJ/TwoWirePIO_RP2040) (>=1.3.2)** — PIO+DMA I2C transport layer (installed automatically by Library Manager)
 - [arduino-pico](https://github.com/earlephilhower/arduino-pico) — Arduino core for RP2040 (Earle Philhower)
 
+## Changelog
+
+### v1.3.0 (2026-07-14)
+
+- **PIO+DMA cold-start fix** — Prime SM with 5 dummy reads before `begin()` for reliable first-boot operation
+- **GPIO bit-bang for critical writes** — Reset and config register writes use GPIO during `begin()`, eliminating PIO+DMA write unreliability on cold-start
+- **`setMode()` oversampling fix** — Remove read-modify-write pattern that corrupted temperature/pressure oversampling register bits
+- **CTRL_MEAS NACK retry** — Retry up to 3 times on NACK with 500µs backoff for robust mode transitions
+- **Dual-core I2C logic analyzer** — Diagnostic example using Core 1 as ~5 MHz logic analyzer to debug PIO+DMA timing issues
+- **Comprehensive hardware test suite** — 5 sensors, 7 tests, 850+ readings, 0 failures across PIO+DMA, GPIO bit-bang, forced mode, hardware Wire, multi-sensor, benchmark, and 30s stability
+- **GPIO 0/1 + USB Serial coexistence** — Documented that GPIO 0/1 work for I2C simultaneously with USB CDC Serial (only `Serial1` hardware UART0 conflicts)
+
+### v1.2.4 (2026-07-12)
+
+- Fix `maintainer` field as boolean in `library.json`
+- Fix dependency name in README (`TwoWirePIO_RP2040` → `WirePIO`)
+- Complete README rewrite: fix stale API docs, wrong defaults, missing methods
+- Fix documentation: add `@author` tags, Author section
+- Fix library metadata, add `forceGPIO()`, calibration fix, benchmark example
+- Documentation review: fix phantom APIs, stale references, missing constants
+
 ## License
 
 MIT — see [LICENSE](LICENSE) for details.
